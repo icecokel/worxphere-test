@@ -468,3 +468,20 @@
 - Playwright에서 최종합격 지원자 상세 패널에 `불합격 처리` UI가 없는 것을 확인했다.
 - `PATCH /api/applicants/applicant-0471/stage`에 `{ "stage": "불합격" }`을 요청해 `400`과 오류 메시지를 확인했다.
 - `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm build`, `git diff --check`를 통과했다.
+
+### 프롬프트 6
+
+> 컴펌도 모달로 만든다 샤드씨엔 참고해서 만들고
+
+### AI 출력 요지
+
+- 브라우저 기본 확인창을 shadcn/ui `AlertDialog`로 교체했다.
+- 정규 단계 변경과 불합격 처리가 같은 확인 모달을 사용하며, 불합격 확정 버튼에만 destructive variant를 적용했다.
+- 모달의 취소는 대상 단계 상태만 지우고, 확정은 기존 낙관적 저장과 롤백 경로를 호출한다.
+- 상세 패널 위에서도 모달을 조작할 수 있도록 `AlertDialog`의 레이어를 패널보다 높게 설정했다.
+
+### 리뷰 / 검증
+
+- Playwright에서 정규 단계 변경과 불합격 처리 모달에 지원자·현재·대상 단계·알림 가능성이 표시되고 취소가 모달을 닫는지 확인했다.
+- 정규 단계 변경을 확정해 카드의 단계가 `서류검토`에서 `면접`으로 갱신되는지 확인했다.
+- `pnpm test:filter`, `pnpm test:pagination`, `pnpm test:hooks`, `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm build`, `git diff --check`를 통과했다.
