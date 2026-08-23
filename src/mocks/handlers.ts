@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse, type RequestHandler } from "msw";
 
 import {
+  filterApplicants,
   paginateApplicants,
   STAGES,
   type ApiErrorResponseSchema,
@@ -211,8 +212,9 @@ async function getApplicantsResolver({ request }: { request: Request }) {
 
   const searchParams = new URL(request.url).searchParams;
   const requestedStage = searchParams.get("stage");
-  const requestedPage = searchParams.get("page");
-  const page = Number(requestedPage ?? "1");
+  const requestedName = searchParams.get("name") ?? "";
+  const requestedRoles = searchParams.getAll("role");
+  const page = Number(searchParams.get("page") ?? "1");
 
   if (
     (requestedStage !== null && !isStage(requestedStage)) ||
@@ -222,20 +224,17 @@ async function getApplicantsResolver({ request }: { request: Request }) {
     return errorResponse("페이지 요청이 올바르지 않습니다.", 400);
   }
 
+  const filteredApplicants = filterApplicants(
+    getApplicants(),
+    requestedName,
+    requestedRoles,
+  );
   const stageApplicants = requestedStage
-    ? getApplicants().filter(function matchesRequestedStage(applicant) {
+    ? filteredApplicants.filter(function matchesRequestedStage(applicant) {
         return applicant.stage === requestedStage;
       })
-    : getApplicants();
-  const response =
-    requestedStage === null && requestedPage === null
-      ? {
-          applicants: stageApplicants,
-          total: stageApplicants.length,
-          page: 1,
-          hasMore: false,
-        }
-      : paginateApplicants(stageApplicants, page);
+    : filteredApplicants;
+  const response = paginateApplicants(stageApplicants, page);
 
   return HttpResponse.json<GetApplicantsResponseSchema>(response);
 }

@@ -18,14 +18,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -35,7 +29,6 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  filterApplicants,
   matchesApplicantFilters,
   STAGES,
   type Applicant,
@@ -45,7 +38,6 @@ import {
 
 const LOADING_CARD_KEYS = ["first", "second", "third"];
 const LOAD_MORE_THRESHOLD_PX = 160;
-const ALL_ROLES_VALUE = "all";
 
 const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
   서류검토: "bg-chart-1",
@@ -90,28 +82,33 @@ function createInitialBoardState(): PipelineBoardState {
 async function fetchApplicants(
   stage: Stage,
   page: number,
+  nameQuery: string,
+  selectedRoles: readonly string[] | null,
   signal: AbortSignal,
 ): Promise<GetApplicantsResponseSchema> {
   const searchParams = new URLSearchParams({
     stage,
     page: String(page),
   });
-  const response = await fetch(`/api/applicants?${searchParams}`, { signal });
+  const trimmedNameQuery = nameQuery.trim();
+
+  if (trimmedNameQuery !== "") {
+    searchParams.set("name", trimmedNameQuery);
+  }
+
+  function appendSelectedRole(role: string) {
+    searchParams.append("role", role);
+  }
+
+  selectedRoles?.forEach(appendSelectedRole);
+
+  const response = await fetch(`/api/applicants?${searchParams}`, {
+    signal,
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     throw new Error("지원자 조회 실패");
-  }
-
-  return (await response.json()) as GetApplicantsResponseSchema;
-}
-
-async function fetchApplicantIndex(
-  signal: AbortSignal,
-): Promise<GetApplicantsResponseSchema> {
-  const response = await fetch("/api/applicants", { signal });
-
-  if (!response.ok) {
-    throw new Error("지원자 검색 데이터 조회 실패");
   }
 
   return (await response.json()) as GetApplicantsResponseSchema;
@@ -189,6 +186,39 @@ function LoadingColumn({ stage }: { stage: Stage }) {
   );
 }
 
+function RoleCheckbox({
+  role,
+  checked,
+  disabled,
+  onCheckedChange,
+}: {
+  role: string;
+  checked: boolean;
+  disabled: boolean;
+  onCheckedChange: (role: string, checked: boolean) => void;
+}) {
+  const id = `role-filter-${encodeURIComponent(role)}`;
+
+  function handleCheckedChange(nextChecked: boolean) {
+    onCheckedChange(role, nextChecked);
+  }
+
+  return (
+    <label
+      className="flex items-center gap-2 text-sm font-normal"
+      htmlFor={id}
+    >
+      <Checkbox
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={handleCheckedChange}
+      />
+      {role}
+    </label>
+  );
+}
+
 function PipelineColumn({
   stage,
   columnState,
@@ -231,7 +261,7 @@ function PipelineColumn({
     }
   }
 
-  if (!hasActiveFilters && isLoading && applicants.length === 0) {
+  if (isLoading && applicants.length === 0) {
     return <LoadingColumn stage={stage} />;
   }
 
@@ -338,16 +368,13 @@ export function PipelineBoard() {
   const [boardState, setBoardState] =
     useState<PipelineBoardState>(createInitialBoardState);
   const [nameQuery, setNameQuery] = useState("");
-  const [selectedRole, setSelectedRole] = useState(ALL_ROLES_VALUE);
+  const [selectedRoles, setSelectedRoles] = useState<string[] | null>(null);
   const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(
     null,
   );
-  const [applicantIndex, setApplicantIndex] = useState<Applicant[] | undefined>(
-    undefined,
-  );
-  const [hasApplicantIndexError, setHasApplicantIndexError] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+  const [areFiltersReady, setAreFiltersReady] = useState(false);
   const requestControllersRef = useRef(new Map<Stage, AbortController>());
-  const applicantIndexControllerRef = useRef<AbortController | null>(null);
 
   const loadedApplicants = useMemo(
     function combineLoadedApplicants() {
@@ -358,114 +385,35 @@ export function PipelineBoard() {
     [boardState],
   );
 
-  const searchableApplicants = applicantIndex ?? loadedApplicants;
-
   const selectedApplicant = useMemo(
     function findSelectedApplicant() {
       if (selectedApplicantId === null) {
         return undefined;
       }
 
-      const loadedApplicant = loadedApplicants.find(
-        function hasSelectedApplicantId(applicant) {
-          return applicant.id === selectedApplicantId;
-        },
-      );
-
-      return (
-        loadedApplicant ??
-        applicantIndex?.find(function hasSelectedIndexApplicantId(applicant) {
-          return applicant.id === selectedApplicantId;
-        })
-      );
+      return loadedApplicants.find(function hasSelectedApplicantId(applicant) {
+        return applicant.id === selectedApplicantId;
+      });
     },
-    [applicantIndex, loadedApplicants, selectedApplicantId],
+    [loadedApplicants, selectedApplicantId],
   );
 
-  const availableRoles = useMemo(
-    function calculateAvailableRoles() {
-      return Array.from(
-        new Set(
-          searchableApplicants.map(function getApplicantRole(applicant) {
-            return applicant.role;
-          }),
-        ),
-      );
-    },
-    [searchableApplicants],
-  );
+  const hasActiveFilters = nameQuery.trim() !== "" || selectedRoles !== null;
 
-  const hasActiveFilters =
-    nameQuery.trim() !== "" || selectedRole !== ALL_ROLES_VALUE;
-
-  const visibleBoardState = useMemo(
-    function calculateVisibleBoardState() {
-      if (!hasActiveFilters) {
-        return boardState;
-      }
-
-      const role =
-        selectedRole === ALL_ROLES_VALUE ? undefined : selectedRole;
-      const filteredApplicants = filterApplicants(
-        searchableApplicants,
-        nameQuery,
-        role,
-      );
-
-      return Object.fromEntries(
-        STAGES.map(function createVisibleStageEntry(stage) {
-          const columnState = boardState[stage];
-          const applicants = filteredApplicants.filter(
-            function matchesVisibleStage(applicant) {
-              return applicant.stage === stage;
-            },
-          );
-
-          return [
-            stage,
-            {
-              ...columnState,
-              applicants,
-              total: applicants.length,
-              hasMore: false,
-              isLoading: false,
-              hasError: false,
-            },
-          ];
-        }),
-      ) as PipelineBoardState;
-    },
-    [
-      boardState,
-      hasActiveFilters,
-      nameQuery,
-      searchableApplicants,
-      selectedRole,
-    ],
-  );
-
-  const areFiltersDisabled =
-    applicantIndex === undefined ||
-    hasApplicantIndexError ||
-    STAGES.some(function isStageInitiallyLoading(stage) {
-      const columnState = boardState[stage];
-      return columnState.isLoading && columnState.applicants.length === 0;
-    });
+  const areFiltersDisabled = !areFiltersReady;
 
   function closeDetailWhenApplicantIsHidden(
     nextNameQuery: string,
-    nextSelectedRole: string,
+    nextSelectedRoles: readonly string[] | null,
   ) {
     if (selectedApplicant === undefined) {
       return;
     }
 
-    const role =
-      nextSelectedRole === ALL_ROLES_VALUE ? undefined : nextSelectedRole;
     const isVisible = matchesApplicantFilters(
       selectedApplicant,
       nextNameQuery,
-      role,
+      nextSelectedRoles ?? [],
     );
 
     if (!isVisible) {
@@ -476,13 +424,24 @@ export function PipelineBoard() {
   function handleNameQueryChange(event: ChangeEvent<HTMLInputElement>) {
     const nextNameQuery = event.currentTarget.value;
     setNameQuery(nextNameQuery);
-    closeDetailWhenApplicantIsHidden(nextNameQuery, selectedRole);
+    closeDetailWhenApplicantIsHidden(nextNameQuery, selectedRoles);
   }
 
-  function handleRoleChange(role: string | null) {
-    const nextSelectedRole = role ?? ALL_ROLES_VALUE;
-    setSelectedRole(nextSelectedRole);
-    closeDetailWhenApplicantIsHidden(nameQuery, nextSelectedRole);
+  function handleRoleCheckedChange(role: string, checked: boolean) {
+    const currentSelectedRoles = selectedRoles ?? availableRoles;
+    const nextSelectedRoles = checked
+      ? [...currentSelectedRoles, role]
+      : currentSelectedRoles.filter(function excludeUncheckedRole(selectedRole) {
+          return selectedRole !== role;
+        });
+    const normalizedSelectedRoles =
+      nextSelectedRoles.length === 0 ||
+      nextSelectedRoles.length === availableRoles.length
+        ? null
+        : nextSelectedRoles;
+
+    setSelectedRoles(normalizedSelectedRoles);
+    closeDetailWhenApplicantIsHidden(nameQuery, normalizedSelectedRoles);
   }
 
   function handleApplicantSelect(applicantId: string) {
@@ -495,40 +454,17 @@ export function PipelineBoard() {
     }
   }
 
-  function renderRoleOption(role: string) {
+  function renderRoleCheckbox(role: string) {
     return (
-      <SelectItem key={role} value={role}>
-        {role}
-      </SelectItem>
+      <RoleCheckbox
+        key={role}
+        role={role}
+        checked={selectedRoles === null || selectedRoles.includes(role)}
+        disabled={areFiltersDisabled}
+        onCheckedChange={handleRoleCheckedChange}
+      />
     );
   }
-
-  const loadApplicantIndex = useCallback(function loadApplicantIndex() {
-    if (applicantIndexControllerRef.current !== null) {
-      return;
-    }
-
-    const controller = new AbortController();
-    applicantIndexControllerRef.current = controller;
-    setHasApplicantIndexError(false);
-
-    fetchApplicantIndex(controller.signal)
-      .then(function showApplicantIndex(response) {
-        if (!controller.signal.aborted) {
-          setApplicantIndex(response.applicants);
-        }
-      })
-      .catch(function showApplicantIndexError() {
-        if (!controller.signal.aborted) {
-          setHasApplicantIndexError(true);
-        }
-      })
-      .finally(function clearApplicantIndexRequest() {
-        if (applicantIndexControllerRef.current === controller) {
-          applicantIndexControllerRef.current = null;
-        }
-      });
-  }, []);
 
   const loadStagePage = useCallback(function loadStagePage(
     stage: Stage,
@@ -544,19 +480,34 @@ export function PipelineBoard() {
     setBoardState(function markStageLoading(currentState) {
       return {
         ...currentState,
-        [stage]: {
-          ...currentState[stage],
-          isLoading: true,
-          hasError: false,
-        },
+        [stage]:
+          page === 1
+            ? createInitialColumnState()
+            : {
+                ...currentState[stage],
+                isLoading: true,
+                hasError: false,
+              },
       };
     });
 
-    fetchApplicants(stage, page, controller.signal)
+    fetchApplicants(stage, page, nameQuery, selectedRoles, controller.signal)
       .then(function showStageApplicants(response) {
         if (controller.signal.aborted) {
           return;
         }
+
+        setAvailableRoles(function mergeAvailableRoles(currentRoles) {
+          const nextRoles = new Set(currentRoles);
+
+          response.applicants.forEach(function addApplicantRole(applicant) {
+            nextRoles.add(applicant.role);
+          });
+
+          return nextRoles.size === currentRoles.length
+            ? currentRoles
+            : Array.from(nextRoles);
+        });
 
         setBoardState(function appendStageApplicants(currentState) {
           const currentColumn = currentState[stage];
@@ -595,15 +546,18 @@ export function PipelineBoard() {
       .finally(function clearStageRequest() {
         if (requestControllersRef.current.get(stage) === controller) {
           requestControllersRef.current.delete(stage);
+
+          if (requestControllersRef.current.size === 0) {
+            setAreFiltersReady(true);
+          }
         }
       });
-  }, []);
+  }, [nameQuery, selectedRoles]);
 
   useEffect(
     function loadInitialApplicants() {
       const requestControllers = requestControllersRef.current;
 
-      loadApplicantIndex();
       STAGES.forEach(function loadFirstStagePage(stage) {
         loadStagePage(stage, 1);
       });
@@ -613,11 +567,9 @@ export function PipelineBoard() {
           controller.abort();
         });
         requestControllers.clear();
-        applicantIndexControllerRef.current?.abort();
-        applicantIndexControllerRef.current = null;
       };
     },
-    [loadApplicantIndex, loadStagePage],
+    [loadStagePage],
   );
 
   return (
@@ -641,42 +593,26 @@ export function PipelineBoard() {
             onChange={handleNameQueryChange}
           />
         </label>
-        <label className="grid gap-1.5 text-sm font-medium" htmlFor="role-filter">
-          직무
-          <Select
-            value={selectedRole}
-            disabled={areFiltersDisabled}
-            onValueChange={handleRoleChange}
-          >
-            <SelectTrigger id="role-filter" className="w-56">
-              <SelectValue>
-                {selectedRole === ALL_ROLES_VALUE ? "전체" : selectedRole}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent align="start">
-              <SelectItem value={ALL_ROLES_VALUE}>전체</SelectItem>
-              {availableRoles.map(renderRoleOption)}
-            </SelectContent>
-          </Select>
-        </label>
-        {hasApplicantIndexError ? (
-          <div
-            role="alert"
-            className="flex items-center gap-2 self-end text-sm text-muted-foreground"
-          >
-            <span>검색 데이터를 불러오지 못했습니다.</span>
-            <Button size="sm" variant="outline" onClick={loadApplicantIndex}>
-              다시 시도
-            </Button>
+        <fieldset className="grid gap-1.5">
+          <legend className="text-sm font-medium">
+            직무
+            <span className="ml-1 font-normal text-muted-foreground">
+              {selectedRoles === null
+                ? "전체"
+                : `${selectedRoles.length}개 선택`}
+            </span>
+          </legend>
+          <div className="flex min-h-8 flex-wrap items-center gap-x-4 gap-y-2">
+            {availableRoles.map(renderRoleCheckbox)}
           </div>
-        ) : null}
+        </fieldset>
       </div>
       <div
         className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
         aria-label="지원자 보드"
       >
         <PipelineColumns
-          boardState={visibleBoardState}
+          boardState={boardState}
           hasActiveFilters={hasActiveFilters}
           onApplicantSelect={handleApplicantSelect}
           onLoadPage={loadStagePage}

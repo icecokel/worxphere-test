@@ -41,13 +41,13 @@ export type Applicant = UpdateApplicantStageResponseSchema;
 export function matchesApplicantFilters(
   applicant: Applicant,
   nameQuery: string,
-  role?: string,
+  roles: readonly string[] = [],
 ): boolean {
   const normalizedNameQuery = nameQuery.trim().toLocaleLowerCase();
   const matchesName = applicant.name
     .toLocaleLowerCase()
     .includes(normalizedNameQuery);
-  const matchesRole = role === undefined || applicant.role === role;
+  const matchesRole = roles.length === 0 || roles.includes(applicant.role);
 
   return matchesName && matchesRole;
 }
@@ -55,10 +55,10 @@ export function matchesApplicantFilters(
 export function filterApplicants(
   applicants: Applicant[],
   nameQuery: string,
-  role?: string,
+  roles: readonly string[] = [],
 ): Applicant[] {
   return applicants.filter(function matchesFilters(applicant) {
-    return matchesApplicantFilters(applicant, nameQuery, role);
+    return matchesApplicantFilters(applicant, nameQuery, roles);
   });
 }
 
