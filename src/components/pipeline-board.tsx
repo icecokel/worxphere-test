@@ -553,6 +553,7 @@ export function PipelineBoard() {
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [areFiltersReady, setAreFiltersReady] = useState(false);
   const requestControllersRef = useRef(new Map<Stage, AbortController>());
+  const savingApplicantIdsRef = useRef(new Set<string>());
 
   const loadedApplicants = useMemo(
     function combineLoadedApplicants() {
@@ -653,11 +654,12 @@ export function PipelineBoard() {
     if (
       location === undefined ||
       !canChangeApplicantStage(location.stage, targetStage) ||
-      savingApplicantIds.has(applicantId)
+      savingApplicantIdsRef.current.has(applicantId)
     ) {
       return;
     }
 
+    savingApplicantIdsRef.current.add(applicantId);
     setSavingApplicantIds(function markApplicantSaving(currentIds) {
       return new Set(currentIds).add(applicantId);
     });
@@ -678,6 +680,7 @@ export function PipelineBoard() {
       });
       setHasStageChangeError(true);
     } finally {
+      savingApplicantIdsRef.current.delete(applicantId);
       setSavingApplicantIds(function clearApplicantSaving(currentIds) {
         const nextIds = new Set(currentIds);
         nextIds.delete(applicantId);
