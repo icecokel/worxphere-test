@@ -2,6 +2,7 @@
 
 import {
   type ChangeEvent,
+  type KeyboardEvent,
   type UIEvent,
   useCallback,
   useEffect,
@@ -39,6 +40,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  getKeyboardStageTarget,
   matchesApplicantFilters,
   orderRoles,
   Stage,
@@ -67,14 +69,6 @@ const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
   [Stage.REJECTED]: "bg-chart-5",
 };
 
-const NEXT_PROGRESS_STAGES: Record<Stage, Stage | null> = {
-  [Stage.DOCUMENT_REVIEW]: Stage.INTERVIEW,
-  [Stage.INTERVIEW]: Stage.COMPENSATION_NEGOTIATION,
-  [Stage.COMPENSATION_NEGOTIATION]: Stage.HIRED,
-  [Stage.HIRED]: null,
-  [Stage.REJECTED]: null,
-};
-
 interface StageColumnState {
   applicants: Applicant[];
   total: number;
@@ -86,18 +80,18 @@ interface StageColumnState {
 
 type PipelineBoardState = Record<Stage, StageColumnState>;
 
-interface ApplicantLocation {
-  applicant: Applicant;
-  index: number;
-  stage: Stage;
-}
-
 interface RecentStageChange {
   applicantId: string;
   applicantName: string;
   previousIndex: number;
   previousStage: Stage;
   currentStage: Stage;
+}
+
+interface PendingStageChange {
+  applicantId: string;
+  targetStage: Stage;
+  returnFocusToCard: boolean;
 }
 
 function createInitialColumnState(): StageColumnState {
@@ -125,11 +119,19 @@ function canChangeApplicantStage(
   currentStage: Stage,
   targetStage: Stage,
 ): boolean {
+  const nextStage = getKeyboardStageTarget(currentStage, "ArrowRight");
+
   return (
-    (targetStage === Stage.REJECTED &&
-      NEXT_PROGRESS_STAGES[currentStage] !== null) ||
-    NEXT_PROGRESS_STAGES[currentStage] === targetStage
+    (targetStage === Stage.REJECTED && nextStage !== null) ||
+    nextStage === targetStage ||
+    getKeyboardStageTarget(currentStage, "ArrowLeft") === targetStage
   );
+}
+
+function focusApplicantCard(applicantId: string) {
+  window.requestAnimationFrame(function focusMovedApplicantCard() {
+    document.getElementById(`applicant-card-${applicantId}`)?.focus();
+  });
 }
 
 async function fetchApplicants(
@@ -191,20 +193,40 @@ function formatAppliedAt(appliedAt: string): string {
 function ApplicantCard({
   applicant,
   onSelect,
+  onStageMove,
 }: {
   applicant: Applicant;
   onSelect: (applicantId: string) => void;
+  onStageMove: (applicantId: string, targetStage: Stage) => void;
 }) {
   function handleSelect() {
     onSelect(applicant.id);
   }
 
+  function handleStageMoveKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+      return;
+    }
+
+    const targetStage = getKeyboardStageTarget(applicant.stage, event.key);
+
+    if (targetStage === null) {
+      return;
+    }
+
+    event.preventDefault();
+    onStageMove(applicant.id, targetStage);
+  }
+
   return (
     <button
+      id={`applicant-card-${applicant.id}`}
       type="button"
       aria-label={`${applicant.name} 지원자 상세 보기`}
+      aria-keyshortcuts="ArrowLeft ArrowRight"
       className="block w-full cursor-pointer rounded-xl text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       onClick={handleSelect}
+      onKeyDown={handleStageMoveKeyDown}
     >
       <Card size="sm">
         <CardHeader>
@@ -297,6 +319,7 @@ function PipelineColumn({
   isBoardEmpty,
   hasActiveFilters,
   onApplicantSelect,
+  onApplicantStageMove,
   onLoadPage,
 }: {
   stage: Stage;
@@ -304,6 +327,7 @@ function PipelineColumn({
   isBoardEmpty: boolean;
   hasActiveFilters: boolean;
   onApplicantSelect: (applicantId: string) => void;
+  onApplicantStageMove: (applicantId: string, targetStage: Stage) => void;
   onLoadPage: (
     stage: Stage,
     page: number,
@@ -327,6 +351,7 @@ function PipelineColumn({
         key={applicant.id}
         applicant={applicant}
         onSelect={onApplicantSelect}
+        onStageMove={onApplicantStageMove}
       />
     );
   }
@@ -418,11 +443,13 @@ function PipelineColumns({
   boardState,
   hasActiveFilters,
   onApplicantSelect,
+  onApplicantStageMove,
   onLoadPage,
 }: {
   boardState: PipelineBoardState;
   hasActiveFilters: boolean;
   onApplicantSelect: (applicantId: string) => void;
+  onApplicantStageMove: (applicantId: string, targetStage: Stage) => void;
   onLoadPage: (
     stage: Stage,
     page: number,
@@ -447,6 +474,7 @@ function PipelineColumns({
         isBoardEmpty={isBoardEmpty}
         hasActiveFilters={hasActiveFilters}
         onApplicantSelect={onApplicantSelect}
+        onApplicantStageMove={onApplicantStageMove}
         onLoadPage={onLoadPage}
       />
     );
@@ -467,7 +495,8 @@ export function PipelineBoard() {
   const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(
     null,
   );
-  const [pendingStage, setPendingStage] = useState<Stage | null>(null);
+  const [pendingStageChange, setPendingStageChange] =
+    useState<PendingStageChange | null>(null);
   const [pendingUndoChange, setPendingUndoChange] =
     useState<RecentStageChange | null>(null);
   const [recentStageChange, setRecentStageChange] =
@@ -505,6 +534,13 @@ export function PipelineBoard() {
     [loadedApplicants, selectedApplicantId],
   );
 
+  const pendingApplicant =
+    pendingStageChange === null
+      ? undefined
+      : findApplicantLocation(boardState, pendingStageChange.applicantId)
+          ?.applicant;
+  const pendingStage = pendingStageChange?.targetStage ?? null;
+
   const hasActiveFilters = nameQuery.trim() !== "" || selectedRoles !== null;
 
   const areFiltersDisabled = !areFiltersReady;
@@ -514,12 +550,11 @@ export function PipelineBoard() {
   const nextProgressStage =
     selectedApplicant === undefined
       ? null
-      : NEXT_PROGRESS_STAGES[selectedApplicant.stage];
+      : getKeyboardStageTarget(selectedApplicant.stage, "ArrowRight");
   const canRejectApplicant =
-    selectedApplicant !== undefined &&
-    NEXT_PROGRESS_STAGES[selectedApplicant.stage] !== null;
+    selectedApplicant !== undefined && nextProgressStage !== null;
   const isStageChangeConfirmationOpen =
-    pendingStage !== null || pendingUndoChange !== null;
+    pendingStageChange !== null || pendingUndoChange !== null;
   const isRejectionPending = pendingStage === Stage.REJECTED;
   const isUndoApplicantSaving =
     recentStageChange !== null &&
@@ -581,6 +616,7 @@ export function PipelineBoard() {
     applicantId: string,
     targetStage: Stage,
     undoChange?: RecentStageChange,
+    returnFocusToCard = false,
   ) {
     const location = findApplicantLocation(boardState, applicantId);
 
@@ -609,6 +645,10 @@ export function PipelineBoard() {
             undoChange.previousIndex,
           );
     });
+
+    if (returnFocusToCard) {
+      focusApplicantCard(applicantId);
+    }
 
     try {
       await updateApplicantStage(applicantId, targetStage);
@@ -640,6 +680,11 @@ export function PipelineBoard() {
           location.index,
         );
       });
+
+      if (returnFocusToCard) {
+        focusApplicantCard(applicantId);
+      }
+
       setHasStageChangeError(true);
     } finally {
       savingApplicantIdsRef.current.delete(applicantId);
@@ -651,17 +696,36 @@ export function PipelineBoard() {
     }
   }
 
-  function requestSelectedApplicantStageChange(targetStage: Stage) {
+  function requestApplicantStageChange(
+    applicantId: string,
+    targetStage: Stage,
+    returnFocusToCard = false,
+  ) {
+    const location = findApplicantLocation(boardState, applicantId);
+
     if (
-      selectedApplicant === undefined ||
-      !canChangeApplicantStage(selectedApplicant.stage, targetStage) ||
-      isSelectedApplicantSaving
+      location === undefined ||
+      !canChangeApplicantStage(location.stage, targetStage) ||
+      savingApplicantIdsRef.current.has(applicantId)
     ) {
       return;
     }
 
     setPendingUndoChange(null);
-    setPendingStage(targetStage);
+    setPendingStageChange({ applicantId, targetStage, returnFocusToCard });
+  }
+
+  function requestSelectedApplicantStageChange(targetStage: Stage) {
+    if (selectedApplicant !== undefined) {
+      requestApplicantStageChange(selectedApplicant.id, targetStage);
+    }
+  }
+
+  function handleApplicantStageMove(
+    applicantId: string,
+    targetStage: Stage,
+  ) {
+    requestApplicantStageChange(applicantId, targetStage, true);
   }
 
   function handleRecentStageChangeUndo() {
@@ -672,7 +736,7 @@ export function PipelineBoard() {
       return;
     }
 
-    setPendingStage(null);
+    setPendingStageChange(null);
     setPendingUndoChange(recentStageChange);
   }
 
@@ -688,7 +752,7 @@ export function PipelineBoard() {
 
   function handleStageChangeConfirmationOpenChange(isOpen: boolean) {
     if (!isOpen) {
-      setPendingStage(null);
+      setPendingStageChange(null);
       setPendingUndoChange(null);
     }
   }
@@ -710,19 +774,24 @@ export function PipelineBoard() {
       return;
     }
 
-    const targetStage = pendingStage;
+    const stageChange = pendingStageChange;
 
     if (
-      selectedApplicant === undefined ||
-      targetStage === null ||
-      !canChangeApplicantStage(selectedApplicant.stage, targetStage)
+      stageChange === null ||
+      pendingApplicant === undefined ||
+      !canChangeApplicantStage(pendingApplicant.stage, stageChange.targetStage)
     ) {
-      setPendingStage(null);
+      setPendingStageChange(null);
       return;
     }
 
-    setPendingStage(null);
-    void saveApplicantStageChange(selectedApplicant.id, targetStage);
+    setPendingStageChange(null);
+    void saveApplicantStageChange(
+      pendingApplicant.id,
+      stageChange.targetStage,
+      undefined,
+      stageChange.returnFocusToCard,
+    );
   }
 
   function handleStageChangeErrorClose() {
@@ -917,6 +986,7 @@ export function PipelineBoard() {
           boardState={boardState}
           hasActiveFilters={hasActiveFilters}
           onApplicantSelect={handleApplicantSelect}
+          onApplicantStageMove={handleApplicantStageMove}
           onLoadPage={loadStagePage}
         />
       </div>
@@ -1027,10 +1097,10 @@ export function PipelineBoard() {
             <AlertDialogDescription>
               {pendingUndoChange !== null
                 ? `${pendingUndoChange.applicantName} 지원자의 단계를 ${STAGE_LABELS[pendingUndoChange.currentStage]}에서 ${STAGE_LABELS[pendingUndoChange.previousStage]} 단계로 되돌립니다.`
-                : selectedApplicant !== undefined && pendingStage !== null
+                : pendingApplicant !== undefined && pendingStage !== null
                 ? isRejectionPending
-                  ? `${selectedApplicant.name} 지원자를 불합격 처리합니다. 현재 단계는 ${STAGE_LABELS[selectedApplicant.stage]}입니다.`
-                  : `${selectedApplicant.name} 지원자의 단계를 ${STAGE_LABELS[selectedApplicant.stage]}에서 ${STAGE_LABELS[pendingStage]} 단계로 변경합니다.`
+                  ? `${pendingApplicant.name} 지원자를 불합격 처리합니다. 현재 단계는 ${STAGE_LABELS[pendingApplicant.stage]}입니다.`
+                  : `${pendingApplicant.name} 지원자의 단계를 ${STAGE_LABELS[pendingApplicant.stage]}에서 ${STAGE_LABELS[pendingStage]} 단계로 변경합니다.`
                 : "단계 변경 내용을 확인해 주세요."}
               <br />
               단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다.

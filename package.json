@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:filter": "node --no-warnings --experimental-strip-types scripts/check-candidate-filter.mjs",
+    "test:keyboard": "node --no-warnings --experimental-strip-types scripts/check-keyboard-flow.mjs",
     "test:pagination": "node --no-warnings --experimental-strip-types scripts/check-pipeline-pagination.mjs",
     "test:stage-code": "node --no-warnings --experimental-strip-types scripts/check-stage-code.mjs",
     "test:stage-move": "node --no-warnings --experimental-strip-types scripts/check-stage-move.mjs",
