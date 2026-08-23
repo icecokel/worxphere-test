@@ -211,7 +211,8 @@ async function getApplicantsResolver({ request }: { request: Request }) {
 
   const searchParams = new URL(request.url).searchParams;
   const requestedStage = searchParams.get("stage");
-  const page = Number(searchParams.get("page") ?? "1");
+  const requestedPage = searchParams.get("page");
+  const page = Number(requestedPage ?? "1");
 
   if (
     (requestedStage !== null && !isStage(requestedStage)) ||
@@ -226,7 +227,15 @@ async function getApplicantsResolver({ request }: { request: Request }) {
         return applicant.stage === requestedStage;
       })
     : getApplicants();
-  const response = paginateApplicants(stageApplicants, page);
+  const response =
+    requestedStage === null && requestedPage === null
+      ? {
+          applicants: stageApplicants,
+          total: stageApplicants.length,
+          page: 1,
+          hasMore: false,
+        }
+      : paginateApplicants(stageApplicants, page);
 
   return HttpResponse.json<GetApplicantsResponseSchema>(response);
 }

@@ -105,6 +105,18 @@ async function fetchApplicants(
   return (await response.json()) as GetApplicantsResponseSchema;
 }
 
+async function fetchApplicantIndex(
+  signal: AbortSignal,
+): Promise<GetApplicantsResponseSchema> {
+  const response = await fetch("/api/applicants", { signal });
+
+  if (!response.ok) {
+    throw new Error("지원자 검색 데이터 조회 실패");
+  }
+
+  return (await response.json()) as GetApplicantsResponseSchema;
+}
+
 function formatAppliedAt(appliedAt: string): string {
   return appliedAt.slice(0, 10).replaceAll("-", ".");
 }
@@ -330,7 +342,12 @@ export function PipelineBoard() {
   const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(
     null,
   );
+  const [applicantIndex, setApplicantIndex] = useState<Applicant[] | undefined>(
+    undefined,
+  );
+  const [hasApplicantIndexError, setHasApplicantIndexError] = useState(false);
   const requestControllersRef = useRef(new Map<Stage, AbortController>());
+  const applicantIndexControllerRef = useRef<AbortController | null>(null);
 
   const loadedApplicants = useMemo(
     function combineLoadedApplicants() {
@@ -341,30 +358,41 @@ export function PipelineBoard() {
     [boardState],
   );
 
+  const searchableApplicants = applicantIndex ?? loadedApplicants;
+
   const selectedApplicant = useMemo(
     function findSelectedApplicant() {
       if (selectedApplicantId === null) {
         return undefined;
       }
 
-      return loadedApplicants.find(function hasSelectedApplicantId(applicant) {
-        return applicant.id === selectedApplicantId;
-      });
+      const loadedApplicant = loadedApplicants.find(
+        function hasSelectedApplicantId(applicant) {
+          return applicant.id === selectedApplicantId;
+        },
+      );
+
+      return (
+        loadedApplicant ??
+        applicantIndex?.find(function hasSelectedIndexApplicantId(applicant) {
+          return applicant.id === selectedApplicantId;
+        })
+      );
     },
-    [loadedApplicants, selectedApplicantId],
+    [applicantIndex, loadedApplicants, selectedApplicantId],
   );
 
   const availableRoles = useMemo(
     function calculateAvailableRoles() {
       return Array.from(
         new Set(
-          loadedApplicants.map(function getApplicantRole(applicant) {
+          searchableApplicants.map(function getApplicantRole(applicant) {
             return applicant.role;
           }),
         ),
       );
     },
-    [loadedApplicants],
+    [searchableApplicants],
   );
 
   const hasActiveFilters =
@@ -378,30 +406,51 @@ export function PipelineBoard() {
 
       const role =
         selectedRole === ALL_ROLES_VALUE ? undefined : selectedRole;
+      const filteredApplicants = filterApplicants(
+        searchableApplicants,
+        nameQuery,
+        role,
+      );
 
       return Object.fromEntries(
         STAGES.map(function createVisibleStageEntry(stage) {
           const columnState = boardState[stage];
-          const applicants = filterApplicants(
-            columnState.applicants,
-            nameQuery,
-            role,
+          const applicants = filteredApplicants.filter(
+            function matchesVisibleStage(applicant) {
+              return applicant.stage === stage;
+            },
           );
 
           return [
             stage,
-            { ...columnState, applicants, total: applicants.length },
+            {
+              ...columnState,
+              applicants,
+              total: applicants.length,
+              hasMore: false,
+              isLoading: false,
+              hasError: false,
+            },
           ];
         }),
       ) as PipelineBoardState;
     },
-    [boardState, hasActiveFilters, nameQuery, selectedRole],
+    [
+      boardState,
+      hasActiveFilters,
+      nameQuery,
+      searchableApplicants,
+      selectedRole,
+    ],
   );
 
-  const isInitialLoading = STAGES.some(function isStageInitiallyLoading(stage) {
-    const columnState = boardState[stage];
-    return columnState.isLoading && columnState.applicants.length === 0;
-  });
+  const areFiltersDisabled =
+    applicantIndex === undefined ||
+    hasApplicantIndexError ||
+    STAGES.some(function isStageInitiallyLoading(stage) {
+      const columnState = boardState[stage];
+      return columnState.isLoading && columnState.applicants.length === 0;
+    });
 
   function closeDetailWhenApplicantIsHidden(
     nextNameQuery: string,
@@ -453,6 +502,33 @@ export function PipelineBoard() {
       </SelectItem>
     );
   }
+
+  const loadApplicantIndex = useCallback(function loadApplicantIndex() {
+    if (applicantIndexControllerRef.current !== null) {
+      return;
+    }
+
+    const controller = new AbortController();
+    applicantIndexControllerRef.current = controller;
+    setHasApplicantIndexError(false);
+
+    fetchApplicantIndex(controller.signal)
+      .then(function showApplicantIndex(response) {
+        if (!controller.signal.aborted) {
+          setApplicantIndex(response.applicants);
+        }
+      })
+      .catch(function showApplicantIndexError() {
+        if (!controller.signal.aborted) {
+          setHasApplicantIndexError(true);
+        }
+      })
+      .finally(function clearApplicantIndexRequest() {
+        if (applicantIndexControllerRef.current === controller) {
+          applicantIndexControllerRef.current = null;
+        }
+      });
+  }, []);
 
   const loadStagePage = useCallback(function loadStagePage(
     stage: Stage,
@@ -524,9 +600,10 @@ export function PipelineBoard() {
   }, []);
 
   useEffect(
-    function loadInitialStagePages() {
+    function loadInitialApplicants() {
       const requestControllers = requestControllersRef.current;
 
+      loadApplicantIndex();
       STAGES.forEach(function loadFirstStagePage(stage) {
         loadStagePage(stage, 1);
       });
@@ -536,9 +613,11 @@ export function PipelineBoard() {
           controller.abort();
         });
         requestControllers.clear();
+        applicantIndexControllerRef.current?.abort();
+        applicantIndexControllerRef.current = null;
       };
     },
-    [loadStagePage],
+    [loadApplicantIndex, loadStagePage],
   );
 
   return (
@@ -556,7 +635,7 @@ export function PipelineBoard() {
             id="name-search"
             type="search"
             className="w-64"
-            disabled={isInitialLoading}
+            disabled={areFiltersDisabled}
             placeholder="지원자 이름 검색"
             value={nameQuery}
             onChange={handleNameQueryChange}
@@ -566,7 +645,7 @@ export function PipelineBoard() {
           직무
           <Select
             value={selectedRole}
-            disabled={isInitialLoading}
+            disabled={areFiltersDisabled}
             onValueChange={handleRoleChange}
           >
             <SelectTrigger id="role-filter" className="w-56">
@@ -580,6 +659,17 @@ export function PipelineBoard() {
             </SelectContent>
           </Select>
         </label>
+        {hasApplicantIndexError ? (
+          <div
+            role="alert"
+            className="flex items-center gap-2 self-end text-sm text-muted-foreground"
+          >
+            <span>검색 데이터를 불러오지 못했습니다.</span>
+            <Button size="sm" variant="outline" onClick={loadApplicantIndex}>
+              다시 시도
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div
         className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
