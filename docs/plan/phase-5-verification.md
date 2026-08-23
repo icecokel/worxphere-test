@@ -72,7 +72,7 @@ Phase 1~4 결과를 Must 기준으로 통합 검증하고, 제출 문서가 실�
 
 ## Task 5.4. Should 검토
 
-모든 Must 검증 후 남은 시간이 있을 때만 별도 계획·feature-key·커밋으로 진행한다.
+모든 Must 검증 후 남은 시간이 있을 때만 [Phase 6](phase-6-should-improvements.md)의 별도 계획·feature-key·커밋으로 진행한다.
 
 - 같은 지원자의 빠른 연속 변경 경쟁 상태 고도화
 - 1,000건 기준 가상화 또는 추가 성능 최적화
