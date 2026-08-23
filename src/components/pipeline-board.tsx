@@ -87,6 +87,14 @@ interface ApplicantLocation {
   stage: Stage;
 }
 
+interface RecentStageChange {
+  applicantId: string;
+  applicantName: string;
+  previousIndex: number;
+  previousStage: Stage;
+  currentStage: Stage;
+}
+
 function createInitialColumnState(): StageColumnState {
   return {
     applicants: [],
@@ -544,6 +552,10 @@ export function PipelineBoard() {
     null,
   );
   const [pendingStage, setPendingStage] = useState<Stage | null>(null);
+  const [pendingUndoChange, setPendingUndoChange] =
+    useState<RecentStageChange | null>(null);
+  const [recentStageChange, setRecentStageChange] =
+    useState<RecentStageChange | null>(null);
   const [savingApplicantIds, setSavingApplicantIds] = useState<Set<string>>(
     function createEmptySavingApplicantIds() {
       return new Set();
@@ -590,8 +602,12 @@ export function PipelineBoard() {
   const canRejectApplicant =
     selectedApplicant !== undefined &&
     NEXT_PROGRESS_STAGES[selectedApplicant.stage] !== null;
-  const isStageChangeConfirmationOpen = pendingStage !== null;
+  const isStageChangeConfirmationOpen =
+    pendingStage !== null || pendingUndoChange !== null;
   const isRejectionPending = pendingStage === Stage.REJECTED;
+  const isUndoApplicantSaving =
+    recentStageChange !== null &&
+    savingApplicantIds.has(recentStageChange.applicantId);
 
   function closeDetailWhenApplicantIsHidden(
     nextNameQuery: string,
@@ -648,12 +664,16 @@ export function PipelineBoard() {
   async function saveApplicantStageChange(
     applicantId: string,
     targetStage: Stage,
+    undoChange?: RecentStageChange,
   ) {
     const location = findApplicantLocation(boardState, applicantId);
 
     if (
       location === undefined ||
-      !canChangeApplicantStage(location.stage, targetStage) ||
+      (undoChange === undefined
+        ? !canChangeApplicantStage(location.stage, targetStage)
+        : location.stage !== undoChange.currentStage ||
+          targetStage !== undoChange.previousStage) ||
       savingApplicantIdsRef.current.has(applicantId)
     ) {
       return;
@@ -664,11 +684,37 @@ export function PipelineBoard() {
       return new Set(currentIds).add(applicantId);
     });
     setBoardState(function showOptimisticStage(currentState) {
-      return moveApplicantToStage(currentState, applicantId, targetStage);
+      return undoChange === undefined
+        ? moveApplicantToStage(currentState, applicantId, targetStage)
+        : restoreApplicantStage(
+            currentState,
+            applicantId,
+            targetStage,
+            undoChange.previousIndex,
+          );
     });
 
     try {
       await updateApplicantStage(applicantId, targetStage);
+
+      if (undoChange !== undefined) {
+        setRecentStageChange(function clearUndoneStageChange(currentChange) {
+          return currentChange === undoChange ? null : currentChange;
+        });
+      } else if (
+        targetStage === Stage.HIRED ||
+        targetStage === Stage.REJECTED
+      ) {
+        setRecentStageChange(null);
+      } else {
+        setRecentStageChange({
+          applicantId,
+          applicantName: location.applicant.name,
+          previousIndex: location.index,
+          previousStage: location.stage,
+          currentStage: targetStage,
+        });
+      }
     } catch {
       setBoardState(function rollbackApplicantStage(currentState) {
         return restoreApplicantStage(
@@ -698,7 +744,20 @@ export function PipelineBoard() {
       return;
     }
 
+    setPendingUndoChange(null);
     setPendingStage(targetStage);
+  }
+
+  function handleRecentStageChangeUndo() {
+    if (
+      recentStageChange === null ||
+      savingApplicantIdsRef.current.has(recentStageChange.applicantId)
+    ) {
+      return;
+    }
+
+    setPendingStage(null);
+    setPendingUndoChange(recentStageChange);
   }
 
   function handleNextProgressStageChange() {
@@ -714,10 +773,27 @@ export function PipelineBoard() {
   function handleStageChangeConfirmationOpenChange(isOpen: boolean) {
     if (!isOpen) {
       setPendingStage(null);
+      setPendingUndoChange(null);
     }
   }
 
   function handleStageChangeConfirmation() {
+    const undoChange = pendingUndoChange;
+
+    if (undoChange !== null) {
+      setPendingUndoChange(null);
+
+      if (undoChange === recentStageChange) {
+        void saveApplicantStageChange(
+          undoChange.applicantId,
+          undoChange.previousStage,
+          undoChange,
+        );
+      }
+
+      return;
+    }
+
     const targetStage = pendingStage;
 
     if (
@@ -735,6 +811,10 @@ export function PipelineBoard() {
 
   function handleStageChangeErrorClose() {
     setHasStageChangeError(false);
+  }
+
+  function handleRecentStageChangeClose() {
+    setRecentStageChange(null);
   }
 
   function handleDetailOpenChange(isOpen: boolean) {
@@ -1022,12 +1102,16 @@ export function PipelineBoard() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {isRejectionPending
+              {pendingUndoChange !== null
+                ? "단계 변경 실행 취소 확인"
+                : isRejectionPending
                 ? "불합격 처리 확인"
                 : "채용 단계 변경 확인"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {selectedApplicant !== undefined && pendingStage !== null
+              {pendingUndoChange !== null
+                ? `${pendingUndoChange.applicantName} 지원자의 단계를 ${STAGE_LABELS[pendingUndoChange.currentStage]}에서 ${STAGE_LABELS[pendingUndoChange.previousStage]} 단계로 되돌립니다.`
+                : selectedApplicant !== undefined && pendingStage !== null
                 ? isRejectionPending
                   ? `${selectedApplicant.name} 지원자를 불합격 처리합니다. 현재 단계는 ${STAGE_LABELS[selectedApplicant.stage]}입니다.`
                   : `${selectedApplicant.name} 지원자의 단계를 ${STAGE_LABELS[selectedApplicant.stage]}에서 ${STAGE_LABELS[pendingStage]} 단계로 변경합니다.`
@@ -1042,29 +1126,59 @@ export function PipelineBoard() {
               variant={isRejectionPending ? "destructive" : "default"}
               onClick={handleStageChangeConfirmation}
             >
-              {isRejectionPending
+              {pendingUndoChange !== null
+                ? "실행 취소"
+                : isRejectionPending
                 ? "불합격 처리"
                 : `${pendingStage === null ? "" : STAGE_LABELS[pendingStage]} 단계로 변경`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {hasStageChangeError ? (
+      {hasStageChangeError || recentStageChange !== null ? (
         <Card
-          role="alert"
+          role={hasStageChangeError ? "alert" : "status"}
           size="sm"
           className="fixed right-6 bottom-6 z-50 max-w-sm"
         >
           <CardContent className="flex items-center gap-3">
-            <p>{STAGE_CHANGE_ERROR_MESSAGE}</p>
-            <Button
-              className="ml-auto"
-              size="sm"
-              variant="outline"
-              onClick={handleStageChangeErrorClose}
-            >
-              닫기
-            </Button>
+            {hasStageChangeError ? (
+              <>
+                <p>{STAGE_CHANGE_ERROR_MESSAGE}</p>
+                <Button
+                  className="ml-auto"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleStageChangeErrorClose}
+                >
+                  닫기
+                </Button>
+              </>
+            ) : recentStageChange !== null ? (
+              <>
+                <p>
+                  {recentStageChange.applicantName} 지원자의 단계를{" "}
+                  {STAGE_LABELS[recentStageChange.currentStage]} 단계로
+                  변경했습니다.
+                </p>
+                <Button
+                  className="ml-auto"
+                  size="sm"
+                  variant="outline"
+                  disabled={isUndoApplicantSaving}
+                  onClick={handleRecentStageChangeUndo}
+                >
+                  실행 취소
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleRecentStageChangeClose}
+                >
+                  닫기
+                </Button>
+              </>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
