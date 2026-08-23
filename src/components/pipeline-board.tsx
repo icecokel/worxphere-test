@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  type ChangeEvent,
   type UIEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -16,8 +18,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  filterApplicants,
   STAGES,
   type Applicant,
   type GetApplicantsResponseSchema,
@@ -26,6 +37,7 @@ import {
 
 const LOADING_CARD_KEYS = ["first", "second", "third"];
 const LOAD_MORE_THRESHOLD_PX = 160;
+const ALL_ROLES_VALUE = "all";
 
 const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
   서류검토: "bg-chart-1",
@@ -144,11 +156,13 @@ function PipelineColumn({
   stage,
   columnState,
   isBoardEmpty,
+  hasActiveFilters,
   onLoadPage,
 }: {
   stage: Stage;
   columnState: StageColumnState;
   isBoardEmpty: boolean;
+  hasActiveFilters: boolean;
   onLoadPage: (stage: Stage, page: number) => void;
 }) {
   const { applicants, total, nextPage, hasMore, isLoading, hasError } =
@@ -172,7 +186,7 @@ function PipelineColumn({
     }
   }
 
-  if (isLoading && applicants.length === 0) {
+  if (!hasActiveFilters && isLoading && applicants.length === 0) {
     return <LoadingColumn stage={stage} />;
   }
 
@@ -222,7 +236,11 @@ function PipelineColumn({
 
         {applicants.length === 0 && !hasError ? (
           <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-            {isBoardEmpty ? "등록된 지원자가 없습니다." : "지원자 없음"}
+            {hasActiveFilters
+              ? "조건에 맞는 지원자가 없습니다."
+              : isBoardEmpty
+                ? "등록된 지원자가 없습니다."
+                : "지원자 없음"}
           </p>
         ) : null}
       </div>
@@ -232,9 +250,11 @@ function PipelineColumn({
 
 function PipelineColumns({
   boardState,
+  hasActiveFilters,
   onLoadPage,
 }: {
   boardState: PipelineBoardState;
+  hasActiveFilters: boolean;
   onLoadPage: (stage: Stage, page: number) => void;
 }) {
   const isBoardEmpty = STAGES.every(function isStageEmpty(stage) {
@@ -253,6 +273,7 @@ function PipelineColumns({
         stage={stage}
         columnState={boardState[stage]}
         isBoardEmpty={isBoardEmpty}
+        hasActiveFilters={hasActiveFilters}
         onLoadPage={onLoadPage}
       />
     );
@@ -268,7 +289,83 @@ function PipelineColumns({
 export function PipelineBoard() {
   const [boardState, setBoardState] =
     useState<PipelineBoardState>(createInitialBoardState);
+  const [nameQuery, setNameQuery] = useState("");
+  const [selectedRole, setSelectedRole] = useState(ALL_ROLES_VALUE);
   const requestControllersRef = useRef(new Map<Stage, AbortController>());
+
+  const loadedApplicants = useMemo(
+    function combineLoadedApplicants() {
+      return STAGES.flatMap(function getStageApplicants(stage) {
+        return boardState[stage].applicants;
+      });
+    },
+    [boardState],
+  );
+
+  const availableRoles = useMemo(
+    function calculateAvailableRoles() {
+      return Array.from(
+        new Set(
+          loadedApplicants.map(function getApplicantRole(applicant) {
+            return applicant.role;
+          }),
+        ),
+      );
+    },
+    [loadedApplicants],
+  );
+
+  const hasActiveFilters =
+    nameQuery.trim() !== "" || selectedRole !== ALL_ROLES_VALUE;
+
+  const visibleBoardState = useMemo(
+    function calculateVisibleBoardState() {
+      if (!hasActiveFilters) {
+        return boardState;
+      }
+
+      const role =
+        selectedRole === ALL_ROLES_VALUE ? undefined : selectedRole;
+
+      return Object.fromEntries(
+        STAGES.map(function createVisibleStageEntry(stage) {
+          const columnState = boardState[stage];
+          const applicants = filterApplicants(
+            columnState.applicants,
+            nameQuery,
+            role,
+          );
+
+          return [
+            stage,
+            { ...columnState, applicants, total: applicants.length },
+          ];
+        }),
+      ) as PipelineBoardState;
+    },
+    [boardState, hasActiveFilters, nameQuery, selectedRole],
+  );
+
+  const isInitialLoading = STAGES.some(function isStageInitiallyLoading(stage) {
+    const columnState = boardState[stage];
+    return columnState.isLoading && columnState.applicants.length === 0;
+  });
+
+  function handleNameQueryChange(event: ChangeEvent<HTMLInputElement>) {
+    setNameQuery(event.currentTarget.value);
+  }
+
+  function handleRoleChange(role: string | null) {
+    setSelectedRole(role ?? ALL_ROLES_VALUE);
+  }
+
+  function renderRoleOption(role: string) {
+    return (
+      <SelectItem key={role} value={role}>
+        {role}
+      </SelectItem>
+    );
+  }
 
   const loadStagePage = useCallback(function loadStagePage(
     stage: Stage,
@@ -363,10 +460,49 @@ export function PipelineBoard() {
         <h1 className="text-2xl font-semibold">채용 파이프라인 보드</h1>
       </header>
       <div
+        aria-label="지원자 검색과 필터"
+        className="flex shrink-0 flex-wrap gap-4"
+      >
+        <label className="grid gap-1.5 text-sm font-medium" htmlFor="name-search">
+          이름 검색
+          <Input
+            id="name-search"
+            type="search"
+            className="w-64"
+            disabled={isInitialLoading}
+            placeholder="지원자 이름 검색"
+            value={nameQuery}
+            onChange={handleNameQueryChange}
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm font-medium" htmlFor="role-filter">
+          직무
+          <Select
+            value={selectedRole}
+            disabled={isInitialLoading}
+            onValueChange={handleRoleChange}
+          >
+            <SelectTrigger id="role-filter" className="w-56">
+              <SelectValue>
+                {selectedRole === ALL_ROLES_VALUE ? "전체" : selectedRole}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent align="start">
+              <SelectItem value={ALL_ROLES_VALUE}>전체</SelectItem>
+              {availableRoles.map(renderRoleOption)}
+            </SelectContent>
+          </Select>
+        </label>
+      </div>
+      <div
         className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
         aria-label="지원자 보드"
       >
-        <PipelineColumns boardState={boardState} onLoadPage={loadStagePage} />
+        <PipelineColumns
+          boardState={visibleBoardState}
+          hasActiveFilters={hasActiveFilters}
+          onLoadPage={loadStagePage}
+        />
       </div>
     </main>
   );

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:filter": "node --no-warnings --experimental-strip-types scripts/check-candidate-filter.mjs",
     "test:pagination": "node --no-warnings --experimental-strip-types scripts/check-pipeline-pagination.mjs",
     "prepare": "sh .githooks/install.sh",
     "test:hooks": "sh .githooks/test-hooks.sh"
