@@ -199,10 +199,6 @@ function errorResponse(error: string, status: number) {
 async function getApplicantsResolver({ request }: { request: Request }) {
   await delay(getRandomDelay());
 
-  if (shouldFail()) {
-    return errorResponse("지원자를 불러오지 못했습니다.", 500);
-  }
-
   const searchParams = new URL(request.url).searchParams;
   const requestedStage = searchParams.get("stage");
   const requestedName = searchParams.get("name") ?? "";
@@ -215,6 +211,10 @@ async function getApplicantsResolver({ request }: { request: Request }) {
     page < 1
   ) {
     return errorResponse("페이지 요청이 올바르지 않습니다.", 400);
+  }
+
+  if (shouldFail()) {
+    return errorResponse("지원자를 불러오지 못했습니다.", 500);
   }
 
   const filteredApplicants = filterApplicants(

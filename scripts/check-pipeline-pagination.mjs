@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { paginateApplicants, Stage } from "../src/lib/pipeline.ts";
 
@@ -26,4 +27,23 @@ function checkPagination() {
   assert.equal(lastPage.hasMore, false);
 }
 
+function checkInvalidRequestPriority() {
+  const source = readFileSync(
+    new URL("../src/mocks/handlers.ts", import.meta.url),
+    "utf8",
+  );
+  const resolver = source.slice(
+    source.indexOf("async function getApplicantsResolver"),
+    source.indexOf("async function updateApplicantStageResolver"),
+  );
+  const invalidRequestIndex = resolver.indexOf(
+    'return errorResponse("페이지 요청이 올바르지 않습니다.", 400);',
+  );
+  const randomFailureIndex = resolver.indexOf("if (shouldFail())");
+
+  assert.ok(invalidRequestIndex >= 0);
+  assert.ok(randomFailureIndex > invalidRequestIndex);
+}
+
 checkPagination();
+checkInvalidRequestPriority();

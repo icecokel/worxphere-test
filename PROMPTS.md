@@ -1012,3 +1012,24 @@
 - README의 저장 키를 `src/mocks/handlers.ts`의 `APPLICANTS_STORAGE_KEY`와 대조했다.
 - `package.json`의 `test:keyboard` 스크립트와 `test:pre-push` 실행 순서를 README 명령 목록과 대조했다.
 - `git diff --check`와 스테이징된 문서 diff 검사를 통과했다.
+
+## [api-response] GET 오류 응답 우선순위 정정
+
+### 프롬프트
+
+> 1. fix/api-response 브랜치 생성
+> 2. 작업 후 커밋 푸시
+> 3. main <- PR
+
+### AI 출력 요지
+
+- 잘못된 GET 요청이 임의 `500`보다 먼저 `400`으로 처리되도록 요청 검증 뒤로 임의 실패 판정을 이동했다.
+- 기존 페이지네이션 검사에 GET 요청 검증과 임의 실패의 실행 순서를 확인하는 회귀 검사를 추가했다.
+- 문서에 이미 명시된 API 계약에 구현을 맞추고 새 추상화나 의존성은 추가하지 않았다.
+
+### 리뷰 / 검증
+
+- `rg`로 `shouldFail` 호출 경로를 확인해 PATCH는 이미 요청 검증 뒤에 임의 실패를 적용하고 GET만 순서가 다른지 대조했다.
+- 수정 전 `pnpm test:pagination`에서 새 우선순위 검사가 실패하고, 수정 후 같은 검사가 통과하는지 확인했다.
+- `pnpm test:pre-push`의 lint, Node 테스트 5종과 프로덕션 빌드가 모두 통과했다.
+- `git diff --check`를 통과했다.
