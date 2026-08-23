@@ -11,8 +11,20 @@ import {
   type UpdateApplicantStageResponseSchema,
 } from "@/lib/pipeline";
 
-const APPLICANT_COUNT = 1_000;
-const APPLICANTS_STORAGE_KEY = "worxphere.applicants";
+const STAGE_APPLICANT_COUNTS: Record<Stage, number> = {
+  서류검토: 320,
+  면접: 120,
+  처우협의: 30,
+  최종합격: 50,
+  불합격: 480,
+};
+const INITIAL_APPLICANT_STAGES = STAGES.flatMap(
+  function createApplicantStages(stage) {
+    return Array<Stage>(STAGE_APPLICANT_COUNTS[stage]).fill(stage);
+  },
+);
+const APPLICANT_COUNT = INITIAL_APPLICANT_STAGES.length;
+const APPLICANTS_STORAGE_KEY = "worxphere.applicants.v2";
 const FAILURE_RATE = 0.15;
 const MIN_DELAY_MS = 200;
 const MAX_DELAY_MS = 800;
@@ -88,7 +100,7 @@ function createApplicant(_value: unknown, index: number): Applicant {
     appliedAt: new Date(
       APPLIED_AT_BASE - (index % APPLIED_AT_RANGE_DAYS) * DAY_MS,
     ).toISOString(),
-    stage: STAGES[index % STAGES.length],
+    stage: INITIAL_APPLICANT_STAGES[index],
   };
 }
 
