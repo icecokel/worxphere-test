@@ -948,6 +948,8 @@
 - `pnpm test:pre-push`의 lint, Node 테스트 5종과 프로덕션 빌드가 모두 통과했다.
 - 공유 `node_modules` 심볼릭 링크로 인한 Turbopack 외부 경로 오류는 워크트리 로컬 의존성 설치 후 재검증해 해소했다.
 - `git diff --check`를 통과했다.
+- PR 간 병합 감사에서 Issue #20과 `docs/requirements.md`의 인접 Should 항목 충돌을 확인해, 1,000건 정량 기준을 검색·필터 성능 항목 안으로 옮기고 기존 Should 문구를 유지했다.
+- 수정 뒤 네 이슈 브랜치의 모든 쌍이 `git merge-tree --write-tree`에서 충돌 없이 병합되는지 확인했다.
 
 ## [stage-move-retry-test] PATCH 실패 후 재시도 잠금 해제 검증
 
