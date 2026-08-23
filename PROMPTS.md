@@ -439,3 +439,32 @@
 ### 리뷰 / 검증
 
 - `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm build`, `git diff --check`를 통과했다.
+
+### 프롬프트 4
+
+> 최종 합격은 불합격이 될 수 없다
+
+### AI 출력 요지
+
+- 불합격 전이 조건을 정규 진행 중인 `서류검토`, `면접`, `처우협의`로 제한했다.
+- 최종합격 상세 패널에서는 불합격 버튼을 비활성화하고 종료 상태임을 안내한다.
+
+### 리뷰 / 검증
+
+- `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm build`, `git diff --check`를 통과했다.
+
+### 프롬프트 5
+
+> 1. 최종합격에서는 불합격 처리 UI 를 표시하지 않는다.
+> 2. api에서도 최종합격의 상태의 지원자 상태 변경을 불합격으로 시도하는경우 400 에러를 떨어 트린다.
+
+### AI 출력 요지
+
+- 최종합격 상세 패널에서는 `불합격 처리` 섹션을 렌더링하지 않는다.
+- mock API는 최종합격 지원자를 불합격으로 변경하려는 PATCH 요청을 임의 실패 처리 전에 `400`으로 거부한다.
+
+### 리뷰 / 검증
+
+- Playwright에서 최종합격 지원자 상세 패널에 `불합격 처리` UI가 없는 것을 확인했다.
+- `PATCH /api/applicants/applicant-0471/stage`에 `{ "stage": "불합격" }`을 요청해 `400`과 오류 메시지를 확인했다.
+- `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm build`, `git diff --check`를 통과했다.

@@ -10,6 +10,16 @@ import {
   useState,
 } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -122,7 +132,8 @@ function canChangeApplicantStage(
   targetStage: Stage,
 ): boolean {
   return (
-    (targetStage === "불합격" && currentStage !== "불합격") ||
+    (targetStage === "불합격" &&
+      NEXT_PROGRESS_STAGES[currentStage] !== null) ||
     NEXT_PROGRESS_STAGES[currentStage] === targetStage
   );
 }
@@ -505,6 +516,7 @@ export function PipelineBoard() {
   const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(
     null,
   );
+  const [pendingStage, setPendingStage] = useState<Stage | null>(null);
   const [savingApplicantIds, setSavingApplicantIds] = useState<Set<string>>(
     function createEmptySavingApplicantIds() {
       return new Set();
@@ -548,7 +560,10 @@ export function PipelineBoard() {
       ? null
       : NEXT_PROGRESS_STAGES[selectedApplicant.stage];
   const canRejectApplicant =
-    selectedApplicant !== undefined && selectedApplicant.stage !== "불합격";
+    selectedApplicant !== undefined &&
+    NEXT_PROGRESS_STAGES[selectedApplicant.stage] !== null;
+  const isStageChangeConfirmationOpen = pendingStage !== null;
+  const isRejectionPending = pendingStage === "불합격";
 
   function closeDetailWhenApplicantIsHidden(
     nextNameQuery: string,
@@ -653,17 +668,7 @@ export function PipelineBoard() {
       return;
     }
 
-    const actionDescription =
-      targetStage === "불합격"
-        ? `${selectedApplicant.name} 지원자를 불합격 처리합니다.`
-        : `${selectedApplicant.name} 지원자의 단계를 변경합니다.`;
-    const shouldChangeStage = window.confirm(
-      `${actionDescription}\n${selectedApplicant.stage} → ${targetStage}\n\n단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다. 계속하시겠습니까?`,
-    );
-
-    if (shouldChangeStage) {
-      void saveApplicantStageChange(selectedApplicant.id, targetStage);
-    }
+    setPendingStage(targetStage);
   }
 
   function handleNextProgressStageChange() {
@@ -674,6 +679,28 @@ export function PipelineBoard() {
 
   function handleApplicantRejection() {
     requestSelectedApplicantStageChange("불합격");
+  }
+
+  function handleStageChangeConfirmationOpenChange(isOpen: boolean) {
+    if (!isOpen) {
+      setPendingStage(null);
+    }
+  }
+
+  function handleStageChangeConfirmation() {
+    const targetStage = pendingStage;
+
+    if (
+      selectedApplicant === undefined ||
+      targetStage === null ||
+      !canChangeApplicantStage(selectedApplicant.stage, targetStage)
+    ) {
+      setPendingStage(null);
+      return;
+    }
+
+    setPendingStage(null);
+    void saveApplicantStageChange(selectedApplicant.id, targetStage);
   }
 
   function handleStageChangeErrorClose() {
@@ -930,30 +957,69 @@ export function PipelineBoard() {
                   </>
                 )}
               </section>
-              <section
-                aria-labelledby="rejection-stage-heading"
-                className="grid gap-3 border-t pt-6"
-              >
-                <h3 id="rejection-stage-heading" className="text-sm font-medium">
-                  불합격 처리
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {canRejectApplicant
-                    ? "불합격 처리는 현재 단계와 관계없이 할 수 있습니다. 처리 전에 내용을 확인해 주세요."
-                    : "이미 불합격 처리된 지원자입니다."}
-                </p>
-                <Button
-                  variant="destructive"
-                  disabled={!canRejectApplicant || isSelectedApplicantSaving}
-                  onClick={handleApplicantRejection}
+              {selectedApplicant.stage !== "최종합격" ? (
+                <section
+                  aria-labelledby="rejection-stage-heading"
+                  className="grid gap-3 border-t pt-6"
                 >
-                  {isSelectedApplicantSaving ? "변경 중…" : "불합격 처리"}
-                </Button>
-              </section>
+                  <h3
+                    id="rejection-stage-heading"
+                    className="text-sm font-medium"
+                  >
+                    불합격 처리
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {canRejectApplicant
+                      ? "정규 진행 중에는 불합격 처리할 수 있습니다. 처리 전에 내용을 확인해 주세요."
+                      : "이미 불합격 처리된 지원자입니다."}
+                  </p>
+                  <Button
+                    variant="destructive"
+                    disabled={!canRejectApplicant || isSelectedApplicantSaving}
+                    onClick={handleApplicantRejection}
+                  >
+                    {isSelectedApplicantSaving ? "변경 중…" : "불합격 처리"}
+                  </Button>
+                </section>
+              ) : null}
             </div>
           ) : null}
         </SheetContent>
       </Sheet>
+      <AlertDialog
+        open={isStageChangeConfirmationOpen}
+        onOpenChange={handleStageChangeConfirmationOpenChange}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRejectionPending
+                ? "불합격 처리 확인"
+                : "채용 단계 변경 확인"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedApplicant !== undefined && pendingStage !== null
+                ? isRejectionPending
+                  ? `${selectedApplicant.name} 지원자를 불합격 처리합니다. 현재 단계는 ${selectedApplicant.stage}입니다.`
+                  : `${selectedApplicant.name} 지원자의 단계를 ${selectedApplicant.stage}에서 ${pendingStage} 단계로 변경합니다.`
+                : "단계 변경 내용을 확인해 주세요."}
+              <br />
+              단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              variant={isRejectionPending ? "destructive" : "default"}
+              onClick={handleStageChangeConfirmation}
+            >
+              {isRejectionPending
+                ? "불합격 처리"
+                : `${pendingStage} 단계로 변경`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {hasStageChangeError ? (
         <Card
           role="alert"
