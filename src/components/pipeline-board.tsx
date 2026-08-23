@@ -362,10 +362,10 @@ function PipelineColumn({
       : "추가 지원자를 불러오지 못했습니다."
     : "지원자를 불러오지 못했습니다.";
 
-  function renderApplicantCard(applicant: Applicant) {
+  function renderApplicantCard(applicant: Applicant, index: number) {
     return (
       <ApplicantCard
-        key={applicant.id}
+        key={`${index}-${applicant.id}`}
         applicant={applicant}
         onSelect={onApplicantSelect}
         onFocusMove={onApplicantFocusMove}
