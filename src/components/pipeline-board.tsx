@@ -2,7 +2,6 @@
 
 import {
   type ChangeEvent,
-  type DragEvent as ReactDragEvent,
   type UIEvent,
   useCallback,
   useEffect,
@@ -39,8 +38,8 @@ import {
 
 const LOADING_CARD_KEYS = ["first", "second", "third"];
 const LOAD_MORE_THRESHOLD_PX = 160;
-const STAGE_MOVE_ERROR_DURATION_MS = 5_000;
-const STAGE_MOVE_ERROR_MESSAGE =
+const STAGE_CHANGE_ERROR_DURATION_MS = 5_000;
+const STAGE_CHANGE_ERROR_MESSAGE =
   "단계 변경에 실패했습니다. 다시 시도해 주세요.";
 
 const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
@@ -49,6 +48,14 @@ const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
   처우협의: "bg-chart-3",
   최종합격: "bg-chart-4",
   불합격: "bg-chart-5",
+};
+
+const NEXT_PROGRESS_STAGES: Record<Stage, Stage | null> = {
+  서류검토: "면접",
+  면접: "처우협의",
+  처우협의: "최종합격",
+  최종합격: null,
+  불합격: null,
 };
 
 interface StageColumnState {
@@ -108,6 +115,16 @@ function findApplicantLocation(
       };
     }
   }
+}
+
+function canChangeApplicantStage(
+  currentStage: Stage,
+  targetStage: Stage,
+): boolean {
+  return (
+    (targetStage === "불합격" && currentStage !== "불합격") ||
+    NEXT_PROGRESS_STAGES[currentStage] === targetStage
+  );
 }
 
 function moveApplicantToStage(
@@ -236,54 +253,21 @@ function formatAppliedAt(appliedAt: string): string {
 
 function ApplicantCard({
   applicant,
-  isSaving,
   onSelect,
-  onDragStart,
-  onDragEnd,
 }: {
   applicant: Applicant;
-  isSaving: boolean;
   onSelect: (applicantId: string) => void;
-  onDragStart: (applicantId: string) => void;
-  onDragEnd: () => void;
 }) {
-  const didDragRef = useRef(false);
-
-  function handlePointerDown() {
-    didDragRef.current = false;
-  }
-
   function handleSelect() {
-    if (didDragRef.current) {
-      didDragRef.current = false;
-      return;
-    }
-
     onSelect(applicant.id);
-  }
-
-  function handleDragStart(event: ReactDragEvent<HTMLButtonElement>) {
-    didDragRef.current = true;
-    event.dataTransfer.setData("text/plain", applicant.id);
-    event.dataTransfer.effectAllowed = "move";
-    onDragStart(applicant.id);
-  }
-
-  function handleDragEnd() {
-    onDragEnd();
   }
 
   return (
     <button
       type="button"
       aria-label={`${applicant.name} 지원자 상세 보기`}
-      aria-busy={isSaving}
-      className={`block w-full rounded-xl text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${isSaving ? "opacity-60" : "cursor-grab active:cursor-grabbing"}`}
-      draggable={!isSaving}
+      className="block w-full cursor-pointer rounded-xl text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       onClick={handleSelect}
-      onDragEnd={handleDragEnd}
-      onDragStart={handleDragStart}
-      onPointerDown={handlePointerDown}
     >
       <Card size="sm">
         <CardHeader>
@@ -293,9 +277,6 @@ function ApplicantCard({
         <CardContent className="space-y-1 text-muted-foreground">
           <p>지원일 {formatAppliedAt(applicant.appliedAt)}</p>
           <p>현재 단계 {applicant.stage}</p>
-          {isSaving ? (
-            <p className="font-medium text-foreground">저장 중…</p>
-          ) : null}
         </CardContent>
       </Card>
     </button>
@@ -376,37 +357,14 @@ function PipelineColumn({
   columnState,
   isBoardEmpty,
   hasActiveFilters,
-  isDropTarget,
-  savingApplicantIds,
   onApplicantSelect,
-  onApplicantDragStart,
-  onApplicantDragEnd,
-  onApplicantDragOver,
-  onApplicantDragLeave,
-  onApplicantDrop,
   onLoadPage,
 }: {
   stage: Stage;
   columnState: StageColumnState;
   isBoardEmpty: boolean;
   hasActiveFilters: boolean;
-  isDropTarget: boolean;
-  savingApplicantIds: ReadonlySet<string>;
   onApplicantSelect: (applicantId: string) => void;
-  onApplicantDragStart: (applicantId: string) => void;
-  onApplicantDragEnd: () => void;
-  onApplicantDragOver: (
-    event: ReactDragEvent<HTMLElement>,
-    stage: Stage,
-  ) => void;
-  onApplicantDragLeave: (
-    event: ReactDragEvent<HTMLElement>,
-    stage: Stage,
-  ) => void;
-  onApplicantDrop: (
-    event: ReactDragEvent<HTMLElement>,
-    stage: Stage,
-  ) => void;
   onLoadPage: (stage: Stage, page: number) => void;
 }) {
   const { applicants, total, nextPage, hasMore, isLoading, hasError } =
@@ -417,24 +375,9 @@ function PipelineColumn({
       <ApplicantCard
         key={applicant.id}
         applicant={applicant}
-        isSaving={savingApplicantIds.has(applicant.id)}
         onSelect={onApplicantSelect}
-        onDragStart={onApplicantDragStart}
-        onDragEnd={onApplicantDragEnd}
       />
     );
-  }
-
-  function handleDragOver(event: ReactDragEvent<HTMLElement>) {
-    onApplicantDragOver(event, stage);
-  }
-
-  function handleDragLeave(event: ReactDragEvent<HTMLElement>) {
-    onApplicantDragLeave(event, stage);
-  }
-
-  function handleDrop(event: ReactDragEvent<HTMLElement>) {
-    onApplicantDrop(event, stage);
   }
 
   function loadNextPage() {
@@ -458,10 +401,7 @@ function PipelineColumn({
   return (
     <section
       aria-labelledby={`stage-${stage}`}
-      className={`flex h-full w-72 shrink-0 flex-col gap-3 rounded-xl border p-3 ${isDropTarget ? "border-primary bg-secondary" : "border-transparent bg-muted/50"}`}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
+      className="flex h-full w-72 shrink-0 flex-col gap-3 rounded-xl border border-transparent bg-muted/50 p-3"
     >
       <header className="flex shrink-0 items-center justify-between gap-3">
         <h2
@@ -518,36 +458,13 @@ function PipelineColumn({
 
 function PipelineColumns({
   boardState,
-  dropTargetStage,
   hasActiveFilters,
-  savingApplicantIds,
   onApplicantSelect,
-  onApplicantDragStart,
-  onApplicantDragEnd,
-  onApplicantDragOver,
-  onApplicantDragLeave,
-  onApplicantDrop,
   onLoadPage,
 }: {
   boardState: PipelineBoardState;
-  dropTargetStage: Stage | null;
   hasActiveFilters: boolean;
-  savingApplicantIds: ReadonlySet<string>;
   onApplicantSelect: (applicantId: string) => void;
-  onApplicantDragStart: (applicantId: string) => void;
-  onApplicantDragEnd: () => void;
-  onApplicantDragOver: (
-    event: ReactDragEvent<HTMLElement>,
-    stage: Stage,
-  ) => void;
-  onApplicantDragLeave: (
-    event: ReactDragEvent<HTMLElement>,
-    stage: Stage,
-  ) => void;
-  onApplicantDrop: (
-    event: ReactDragEvent<HTMLElement>,
-    stage: Stage,
-  ) => void;
   onLoadPage: (stage: Stage, page: number) => void;
 }) {
   const isBoardEmpty = STAGES.every(function isStageEmpty(stage) {
@@ -567,14 +484,7 @@ function PipelineColumns({
         columnState={boardState[stage]}
         isBoardEmpty={isBoardEmpty}
         hasActiveFilters={hasActiveFilters}
-        isDropTarget={dropTargetStage === stage}
-        savingApplicantIds={savingApplicantIds}
         onApplicantSelect={onApplicantSelect}
-        onApplicantDragStart={onApplicantDragStart}
-        onApplicantDragEnd={onApplicantDragEnd}
-        onApplicantDragOver={onApplicantDragOver}
-        onApplicantDragLeave={onApplicantDragLeave}
-        onApplicantDrop={onApplicantDrop}
         onLoadPage={onLoadPage}
       />
     );
@@ -595,16 +505,14 @@ export function PipelineBoard() {
   const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(
     null,
   );
-  const [dropTargetStage, setDropTargetStage] = useState<Stage | null>(null);
   const [savingApplicantIds, setSavingApplicantIds] = useState<Set<string>>(
     function createEmptySavingApplicantIds() {
       return new Set();
     },
   );
-  const [hasStageMoveError, setHasStageMoveError] = useState(false);
+  const [hasStageChangeError, setHasStageChangeError] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [areFiltersReady, setAreFiltersReady] = useState(false);
-  const draggedApplicantIdRef = useRef<string | null>(null);
   const requestControllersRef = useRef(new Map<Stage, AbortController>());
 
   const loadedApplicants = useMemo(
@@ -632,6 +540,15 @@ export function PipelineBoard() {
   const hasActiveFilters = nameQuery.trim() !== "" || selectedRoles !== null;
 
   const areFiltersDisabled = !areFiltersReady;
+  const isSelectedApplicantSaving =
+    selectedApplicant !== undefined &&
+    savingApplicantIds.has(selectedApplicant.id);
+  const nextProgressStage =
+    selectedApplicant === undefined
+      ? null
+      : NEXT_PROGRESS_STAGES[selectedApplicant.stage];
+  const canRejectApplicant =
+    selectedApplicant !== undefined && selectedApplicant.stage !== "불합격";
 
   function closeDetailWhenApplicantIsHidden(
     nextNameQuery: string,
@@ -676,60 +593,16 @@ export function PipelineBoard() {
   }
 
   function handleApplicantSelect(applicantId: string) {
+    const location = findApplicantLocation(boardState, applicantId);
+
+    if (location === undefined) {
+      return;
+    }
+
     setSelectedApplicantId(applicantId);
   }
 
-  function handleApplicantDragStart(applicantId: string) {
-    draggedApplicantIdRef.current = applicantId;
-  }
-
-  function handleApplicantDragEnd() {
-    draggedApplicantIdRef.current = null;
-    setDropTargetStage(null);
-  }
-
-  function handleApplicantDragOver(
-    event: ReactDragEvent<HTMLElement>,
-    targetStage: Stage,
-  ) {
-    const draggedApplicantId = draggedApplicantIdRef.current;
-
-    if (draggedApplicantId === null) {
-      return;
-    }
-
-    const location = findApplicantLocation(boardState, draggedApplicantId);
-
-    if (
-      location === undefined ||
-      location.stage === targetStage ||
-      savingApplicantIds.has(draggedApplicantId)
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDropTargetStage(targetStage);
-  }
-
-  function handleApplicantDragLeave(
-    event: ReactDragEvent<HTMLElement>,
-    targetStage: Stage,
-  ) {
-    if (
-      event.relatedTarget instanceof Node &&
-      event.currentTarget.contains(event.relatedTarget)
-    ) {
-      return;
-    }
-
-    setDropTargetStage(function clearExitedDropTarget(currentStage) {
-      return currentStage === targetStage ? null : currentStage;
-    });
-  }
-
-  async function saveApplicantStageMove(
+  async function saveApplicantStageChange(
     applicantId: string,
     targetStage: Stage,
   ) {
@@ -737,7 +610,7 @@ export function PipelineBoard() {
 
     if (
       location === undefined ||
-      location.stage === targetStage ||
+      !canChangeApplicantStage(location.stage, targetStage) ||
       savingApplicantIds.has(applicantId)
     ) {
       return;
@@ -761,7 +634,7 @@ export function PipelineBoard() {
           location.index,
         );
       });
-      setHasStageMoveError(true);
+      setHasStageChangeError(true);
     } finally {
       setSavingApplicantIds(function clearApplicantSaving(currentIds) {
         const nextIds = new Set(currentIds);
@@ -771,23 +644,40 @@ export function PipelineBoard() {
     }
   }
 
-  function handleApplicantDrop(
-    event: ReactDragEvent<HTMLElement>,
-    targetStage: Stage,
-  ) {
-    const applicantId = event.dataTransfer.getData("text/plain");
+  function requestSelectedApplicantStageChange(targetStage: Stage) {
+    if (
+      selectedApplicant === undefined ||
+      !canChangeApplicantStage(selectedApplicant.stage, targetStage) ||
+      isSelectedApplicantSaving
+    ) {
+      return;
+    }
 
-    event.preventDefault();
-    draggedApplicantIdRef.current = null;
-    setDropTargetStage(null);
+    const actionDescription =
+      targetStage === "불합격"
+        ? `${selectedApplicant.name} 지원자를 불합격 처리합니다.`
+        : `${selectedApplicant.name} 지원자의 단계를 변경합니다.`;
+    const shouldChangeStage = window.confirm(
+      `${actionDescription}\n${selectedApplicant.stage} → ${targetStage}\n\n단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다. 계속하시겠습니까?`,
+    );
 
-    if (applicantId !== "") {
-      void saveApplicantStageMove(applicantId, targetStage);
+    if (shouldChangeStage) {
+      void saveApplicantStageChange(selectedApplicant.id, targetStage);
     }
   }
 
-  function handleStageMoveErrorClose() {
-    setHasStageMoveError(false);
+  function handleNextProgressStageChange() {
+    if (nextProgressStage !== null) {
+      requestSelectedApplicantStageChange(nextProgressStage);
+    }
+  }
+
+  function handleApplicantRejection() {
+    requestSelectedApplicantStageChange("불합격");
+  }
+
+  function handleStageChangeErrorClose() {
+    setHasStageChangeError(false);
   }
 
   function handleDetailOpenChange(isOpen: boolean) {
@@ -915,21 +805,21 @@ export function PipelineBoard() {
   );
 
   useEffect(
-    function dismissStageMoveError() {
-      if (!hasStageMoveError) {
+    function dismissStageChangeError() {
+      if (!hasStageChangeError) {
         return;
       }
 
       const timeoutId = window.setTimeout(
-        handleStageMoveErrorClose,
-        STAGE_MOVE_ERROR_DURATION_MS,
+        handleStageChangeErrorClose,
+        STAGE_CHANGE_ERROR_DURATION_MS,
       );
 
-      return function clearStageMoveErrorTimeout() {
+      return function clearStageChangeErrorTimeout() {
         window.clearTimeout(timeoutId);
       };
     },
-    [hasStageMoveError],
+    [hasStageChangeError],
   );
 
   return (
@@ -973,15 +863,8 @@ export function PipelineBoard() {
       >
         <PipelineColumns
           boardState={boardState}
-          dropTargetStage={dropTargetStage}
           hasActiveFilters={hasActiveFilters}
-          savingApplicantIds={savingApplicantIds}
           onApplicantSelect={handleApplicantSelect}
-          onApplicantDragStart={handleApplicantDragStart}
-          onApplicantDragEnd={handleApplicantDragEnd}
-          onApplicantDragOver={handleApplicantDragOver}
-          onApplicantDragLeave={handleApplicantDragLeave}
-          onApplicantDrop={handleApplicantDrop}
           onLoadPage={loadStagePage}
         />
       </div>
@@ -1016,23 +899,74 @@ export function PipelineBoard() {
                   <dd>{selectedApplicant.stage}</dd>
                 </div>
               </dl>
+              <section
+                aria-labelledby="next-progress-stage-heading"
+                className="grid gap-3"
+              >
+                <h3
+                  id="next-progress-stage-heading"
+                  className="text-sm font-medium"
+                >
+                  다음 채용 단계
+                </h3>
+                {nextProgressStage === null ? (
+                  <p className="text-sm text-muted-foreground">
+                    다음 채용 단계가 없습니다.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      다음 채용 단계는 {nextProgressStage}입니다.
+                      단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다.
+                    </p>
+                    <Button
+                      disabled={isSelectedApplicantSaving}
+                      onClick={handleNextProgressStageChange}
+                    >
+                      {isSelectedApplicantSaving
+                        ? "변경 중…"
+                        : "다음 단계로 변경"}
+                    </Button>
+                  </>
+                )}
+              </section>
+              <section
+                aria-labelledby="rejection-stage-heading"
+                className="grid gap-3 border-t pt-6"
+              >
+                <h3 id="rejection-stage-heading" className="text-sm font-medium">
+                  불합격 처리
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {canRejectApplicant
+                    ? "불합격 처리는 현재 단계와 관계없이 할 수 있습니다. 처리 전에 내용을 확인해 주세요."
+                    : "이미 불합격 처리된 지원자입니다."}
+                </p>
+                <Button
+                  variant="destructive"
+                  disabled={!canRejectApplicant || isSelectedApplicantSaving}
+                  onClick={handleApplicantRejection}
+                >
+                  {isSelectedApplicantSaving ? "변경 중…" : "불합격 처리"}
+                </Button>
+              </section>
             </div>
           ) : null}
         </SheetContent>
       </Sheet>
-      {hasStageMoveError ? (
+      {hasStageChangeError ? (
         <Card
           role="alert"
           size="sm"
           className="fixed right-6 bottom-6 z-50 max-w-sm"
         >
           <CardContent className="flex items-center gap-3">
-            <p>{STAGE_MOVE_ERROR_MESSAGE}</p>
+            <p>{STAGE_CHANGE_ERROR_MESSAGE}</p>
             <Button
               className="ml-auto"
               size="sm"
               variant="outline"
-              onClick={handleStageMoveErrorClose}
+              onClick={handleStageChangeErrorClose}
             >
               닫기
             </Button>

@@ -25,7 +25,7 @@
 | 1 | 지원자 데이터와 mock API 구성 | `mock-api` | 조회·단계 저장·지연·실패·새로고침 유지 | [Phase 1](phase-1-mock-api.md) |
 | 2 | 읽기 전용 파이프라인 보드 구성 | `pipeline-board` | 5개 컬럼, 카드, 로딩·오류·빈 상태 | [Phase 2](phase-2-pipeline-board.md) |
 | 3 | 검색·필터와 상세 패널 구성 | `candidate-filter`, `candidate-detail` | 이름/직무 탐색과 우측 상세 확인 | [Phase 3](phase-3-search-and-detail.md) |
-| 4 | 단계 이동과 낙관적 업데이트 구성 | `stage-move` | 드래그 이동, 저장, 롤백, 실패 알림 | [Phase 4](phase-4-stage-move.md) |
+| 4 | 상세 패널 단계 변경과 낙관적 업데이트 구성 | `stage-move` | 명시적 확인, 저장, 롤백, 실패 알림 | [Phase 4](phase-4-stage-move.md) |
 | 5 | 통합 검증과 제출 문서 정리 | `release-check` | Must 시나리오 검증과 문서 최신화 | [Phase 5](phase-5-verification.md) |
 
 Phase는 순서대로 실행한다. 앞 Phase의 완료 기준을 통과하기 전에는 다음 Phase를 시작하지 않는다.
@@ -47,7 +47,8 @@ Phase는 순서대로 실행한다. 앞 Phase의 완료 기준을 통과하기 �
 3. `feat(candidate-filter): 지원자 이름 검색과 직무 필터 추가`
 4. `feat(candidate-detail): 지원자 상세 패널 추가`
 5. `feat(stage-move): 카드 단계 이동과 실패 롤백 추가`
-6. `docs(release-check): 구현 검증과 제출 문서 정리`
+6. `fix(stage-move): 단계 변경을 상세 패널 액션으로 전환`
+7. `docs(release-check): 구현 검증과 제출 문서 정리`
 
 커밋 직전 실제 변경 범위가 다르면 메시지를 실제 diff에 맞추되 feature-key는 유지한다.
 
@@ -58,7 +59,7 @@ Phase는 순서대로 실행한다. 앞 Phase의 완료 기준을 통과하기 �
 | 단계별 컬럼과 지원자 카드 | `2.2`, `2.3` |
 | 카드 필수 정보 | `2.3` |
 | mock API 저장과 새로고침 유지 | `1.2`, `1.3`, `4.2` |
-| 드래그앤드롭 단계 이동 | `4.1` |
+| 상세 패널의 명시적 단계 변경 | `4.1` |
 | 낙관적 업데이트와 롤백 | `4.2`, `4.3` |
 | 이름 검색과 직무 필터 | `3.1` |
 | 200건 이상 탐색 성능 | `1.2`, `3.1`, `5.2` |
