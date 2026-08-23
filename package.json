@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "prepare": "sh .githooks/install.sh",
+    "test:hooks": "sh .githooks/test-hooks.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

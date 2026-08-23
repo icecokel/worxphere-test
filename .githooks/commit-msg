@@ -1,0 +1,63 @@
+#!/bin/sh
+set -eu
+
+message_file=$1
+subject=$(sed -n '1p' "$message_file")
+
+fail() {
+  printf '[commit-msg] %s\n' "$1" >&2
+  exit 1
+}
+
+case "$subject" in
+  feat:*|fix:*|refactor:*|perf:*|test:*)
+    fail "기능 커밋은 type(feature-key): 요약 형식으로 작성하세요."
+    ;;
+  feat\(*\):*|fix\(*\):*|refactor\(*\):*|perf\(*\):*|test\(*\):*)
+    feature_key=$(printf '%s\n' "$subject" | sed 's/^[^(]*(//; s/).*//')
+
+    case "$feature_key" in
+      ""|*[!a-z0-9-]*)
+        fail "feature-key는 소문자, 숫자, 하이픈만 사용할 수 있습니다."
+        ;;
+    esac
+
+    git diff --cached --name-only --diff-filter=ACMR |
+      grep -Fxq "PROMPTS.md" ||
+      fail "기능 커밋에는 PROMPTS.md 변경이 포함되어야 합니다."
+
+    staged_prompts=$(git show :PROMPTS.md 2>/dev/null) ||
+      fail "스테이징된 PROMPTS.md를 읽을 수 없습니다."
+
+    prompt_section=$(
+      printf '%s\n' "$staged_prompts" |
+        awk -v prefix="## [$feature_key]" '
+          index($0, prefix) == 1 && (length($0) == length(prefix) || substr($0, length(prefix) + 1, 1) == " ") {
+            capture = 1
+          }
+          capture && $0 ~ /^## \[/ && index($0, prefix) != 1 { exit }
+          capture { print }
+        '
+    )
+
+    [ -n "$prompt_section" ] ||
+      fail "PROMPTS.md에 ## [$feature_key] 섹션이 필요합니다."
+
+    require_content() {
+      pattern=$1
+      label=$2
+
+      printf '%s\n' "$prompt_section" |
+        awk -v pattern="$pattern" '
+          $0 ~ pattern { capture = 1; next }
+          capture && /^### / { exit }
+          capture && NF { found = 1 }
+          END { exit found ? 0 : 1 }
+        ' || fail "## [$feature_key] 섹션의 $label 내용을 작성하세요."
+    }
+
+    require_content '^### 프롬프트( [0-9]+)?$' "프롬프트"
+    require_content '^### AI 출력 요지$' "AI 출력 요지"
+    require_content '^### 리뷰 / 검증$' "리뷰 / 검증"
+    ;;
+esac

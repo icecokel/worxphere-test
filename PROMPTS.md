@@ -23,6 +23,44 @@
 - MSW 자동 생성 worker는 ESLint 검사에서 제외하고 애플리케이션 코드는 `pnpm lint`로 검증했다.
 - `pnpm build`로 타입 검사와 프로덕션 빌드가 통과하는지 확인했다.
 
+## [workflow-guardrails] 기능 단위 커밋 자동화
+
+### 프롬프트 1
+
+> - 하나의 기능을 하나의 커밋으로 기록한다.
+> - 커밋을 squash하거나 force-push로 정리하지 않는다.
+> - `PROMPTS.md`에 기능별 프롬프트와 AI 출력에 대한 실제 리뷰·검증 내용을 남긴다.
+>
+> 이 부분을 스킬과 훅으로 만들어 자동으로 세팅되도록하자.
+
+### AI 출력 요지
+
+- 기능 키를 커밋과 `PROMPTS.md`에서 일치시키는 프로젝트 스킬을 추가했다.
+- 기능 커밋의 메시지와 프롬프트 로그 구조를 검사하는 `commit-msg` 훅을 추가했다.
+- 비 fast-forward push를 막는 `pre-push` 훅과 자동 설치 스크립트를 추가했다.
+
+### 리뷰 / 검증
+
+- 하나의 커밋이 의미적으로 하나의 기능인지는 훅으로 정확히 판별할 수 없어 스킬의 판단 규칙으로 남겼다.
+- squash만 선별해 차단하는 것은 신뢰할 수 없어 전체 rebase를 막지 않고 스킬 규칙으로 유지했다.
+- force-push 결과인 비 fast-forward 갱신은 `pre-push`에서 차단하도록 했다.
+- `pnpm test:hooks`로 올바른 로그가 있는 커밋과 fast-forward push는 통과하고, 범위·로그가 없는 기능 커밋과 비 fast-forward push는 실패하는지 검증했다.
+- 스킬 validator와 `pnpm lint`를 통과했으며, 설치된 훅 파일의 실행 권한과 `core.hooksPath` 설정을 확인했다.
+
+### 프롬프트 2
+
+> agents.md에 추가해서 일관되도록 하고
+
+### AI 출력 요지
+
+- 기능 단위 커밋, `feature-key`, `PROMPTS.md`, squash·force-push 규칙을 `AGENTS.md`에 추가했다.
+- 스킬과 훅이 담당하는 범위를 `AGENTS.md`에서도 동일하게 명시했다.
+
+### 리뷰 / 검증
+
+- Next.js가 관리하는 자동 생성 블록은 수정하지 않고 프로젝트 규칙을 블록 밖에 추가했다.
+- `atomic-feature-commits` 스킬, Git 훅, `AGENTS.md`의 규칙이 서로 모순되지 않는지 대조했다.
+
 ## [screen-spec] 파이프라인 화면 설계
 
 ### 프롬프트

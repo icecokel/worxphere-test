@@ -20,3 +20,15 @@ pnpm dev
 실제 백엔드 대신 브라우저 MSW를 사용합니다. 요청 핸들러는 `src/mocks/handlers.ts`에 정의합니다.
 
 기능 요구사항은 [`docs/requirements.md`](docs/requirements.md)를 기준으로 합니다.
+
+## 작업 규칙
+
+`pnpm install` 시 `.githooks`가 자동으로 활성화됩니다.
+
+- 기능 커밋은 `type(feature-key): 요약` 형식을 사용합니다.
+- 같은 `feature-key`의 기록을 `PROMPTS.md`에 포함해야 합니다.
+- 비 fast-forward push는 차단됩니다.
+
+```bash
+pnpm test:hooks
+```
