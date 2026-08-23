@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse, type RequestHandler } from "msw";
 
 import {
+  canChangeApplicantStage,
   filterApplicants,
   ROLES,
   paginateApplicants,
@@ -260,10 +261,12 @@ async function updateApplicantStageResolver({
   }
 
   if (
-    getApplicants()[applicantIndex].stage === Stage.HIRED &&
-    body.stage === Stage.REJECTED
+    !canChangeApplicantStage(
+      getApplicants()[applicantIndex].stage,
+      body.stage,
+    )
   ) {
-    return errorResponse("최종합격한 지원자는 불합격 처리할 수 없습니다.", 400);
+    return errorResponse("허용되지 않은 단계 변경입니다.", 400);
   }
 
   if (shouldFail()) {
