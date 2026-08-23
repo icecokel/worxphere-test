@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse, type RequestHandler } from "msw";
 
 import {
+  paginateApplicants,
   STAGES,
   type ApiErrorResponseSchema,
   type Applicant,
@@ -10,8 +11,20 @@ import {
   type UpdateApplicantStageResponseSchema,
 } from "@/lib/pipeline";
 
-const APPLICANT_COUNT = 1_000;
-const APPLICANTS_STORAGE_KEY = "worxphere.applicants";
+const STAGE_APPLICANT_COUNTS: Record<Stage, number> = {
+  서류검토: 320,
+  면접: 120,
+  처우협의: 30,
+  최종합격: 50,
+  불합격: 480,
+};
+const INITIAL_APPLICANT_STAGES = STAGES.flatMap(
+  function createApplicantStages(stage) {
+    return Array<Stage>(STAGE_APPLICANT_COUNTS[stage]).fill(stage);
+  },
+);
+const APPLICANT_COUNT = INITIAL_APPLICANT_STAGES.length;
+const APPLICANTS_STORAGE_KEY = "worxphere.applicants.v2";
 const FAILURE_RATE = 0.15;
 const MIN_DELAY_MS = 200;
 const MAX_DELAY_MS = 800;
@@ -87,7 +100,7 @@ function createApplicant(_value: unknown, index: number): Applicant {
     appliedAt: new Date(
       APPLIED_AT_BASE - (index % APPLIED_AT_RANGE_DAYS) * DAY_MS,
     ).toISOString(),
-    stage: STAGES[index % STAGES.length],
+    stage: INITIAL_APPLICANT_STAGES[index],
   };
 }
 
@@ -189,16 +202,31 @@ function errorResponse(error: string, status: number) {
   return HttpResponse.json<ApiErrorResponseSchema>({ error }, { status });
 }
 
-async function getApplicantsResolver() {
+async function getApplicantsResolver({ request }: { request: Request }) {
   await delay(getRandomDelay());
 
   if (shouldFail()) {
     return errorResponse("지원자를 불러오지 못했습니다.", 500);
   }
 
-  const response: GetApplicantsResponseSchema = {
-    applicants: getApplicants(),
-  };
+  const searchParams = new URL(request.url).searchParams;
+  const requestedStage = searchParams.get("stage");
+  const page = Number(searchParams.get("page") ?? "1");
+
+  if (
+    (requestedStage !== null && !isStage(requestedStage)) ||
+    !Number.isInteger(page) ||
+    page < 1
+  ) {
+    return errorResponse("페이지 요청이 올바르지 않습니다.", 400);
+  }
+
+  const stageApplicants = requestedStage
+    ? getApplicants().filter(function matchesRequestedStage(applicant) {
+        return applicant.stage === requestedStage;
+      })
+    : getApplicants();
+  const response = paginateApplicants(stageApplicants, page);
 
   return HttpResponse.json<GetApplicantsResponseSchema>(response);
 }
