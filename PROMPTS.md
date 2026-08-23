@@ -853,3 +853,30 @@
 - 재현 가능한 클라이언트 병목이 없어 보드 소스 코드와 의존성을 변경하지 않고 현재 페이지네이션 유지와 가상화 생략을 결정했다.
 - `pnpm test:filter`, `pnpm test:pagination`, `pnpm lint`, `pnpm build`, `git diff --check`를 통과했다.
 - Playwright 세션과 `35555` 서버를 종료하고 이번 검증의 임시 산출물을 휴지통으로 이동했다.
+
+## [readme-runtime-sync] README 런타임 정보 최신화
+
+### 프롬프트 1
+
+> 10번 이슈 브리핑
+
+### 프롬프트 2
+
+> 10번 바로 문서만 갱신하면 될 것 같은데
+> 판단하라
+
+### 프롬프트 3
+
+> 갱신하고 커밋 푸시
+
+### AI 출력 요지
+
+- README의 localStorage 키를 실제 mock 핸들러와 같은 `worxphere.applicants.v4`로 수정했다.
+- 개별 테스트 명령 목록에 pre-push가 실행하는 `pnpm test:keyboard`를 추가했다.
+- 현재 코드와 일치하는 나머지 mock API 설명과 소스 코드는 변경하지 않았다.
+
+### 리뷰 / 검증
+
+- README의 저장 키를 `src/mocks/handlers.ts`의 `APPLICANTS_STORAGE_KEY`와 대조했다.
+- `package.json`의 `test:keyboard` 스크립트와 `test:pre-push` 실행 순서를 README 명령 목록과 대조했다.
+- `git diff --check`와 스테이징된 문서 diff 검사를 통과했다.
