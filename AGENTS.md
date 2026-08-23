@@ -16,3 +16,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Use the same key in behavioral commit subjects: `type(feature-key): Korean summary`.
 - Do not squash commits or use force-push. Preserve correction commits that show the verification process.
 - Keep `.githooks` enabled. Hooks enforce the prompt-log structure and block non-fast-forward pushes; the agent remains responsible for semantic feature boundaries and truthful review notes.
+
+## Coding Conventions
+
+Follow `docs/coding-conventions.md` when writing or modifying code.
+
+- Keep source file names in kebab-case, except fixed names required by frameworks or tools.
+- Do not use barrel exports. Import modules directly from their files.
+- Do not use anonymous functions. Give functions and callbacks descriptive names.
