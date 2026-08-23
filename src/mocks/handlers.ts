@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse, type RequestHandler } from "msw";
 
 import {
+  filterApplicants,
   paginateApplicants,
   STAGES,
   type ApiErrorResponseSchema,
@@ -211,6 +212,8 @@ async function getApplicantsResolver({ request }: { request: Request }) {
 
   const searchParams = new URL(request.url).searchParams;
   const requestedStage = searchParams.get("stage");
+  const requestedName = searchParams.get("name") ?? "";
+  const requestedRoles = searchParams.getAll("role");
   const page = Number(searchParams.get("page") ?? "1");
 
   if (
@@ -221,11 +224,16 @@ async function getApplicantsResolver({ request }: { request: Request }) {
     return errorResponse("페이지 요청이 올바르지 않습니다.", 400);
   }
 
+  const filteredApplicants = filterApplicants(
+    getApplicants(),
+    requestedName,
+    requestedRoles,
+  );
   const stageApplicants = requestedStage
-    ? getApplicants().filter(function matchesRequestedStage(applicant) {
+    ? filteredApplicants.filter(function matchesRequestedStage(applicant) {
         return applicant.stage === requestedStage;
       })
-    : getApplicants();
+    : filteredApplicants;
   const response = paginateApplicants(stageApplicants, page);
 
   return HttpResponse.json<GetApplicantsResponseSchema>(response);

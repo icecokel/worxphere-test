@@ -38,6 +38,30 @@ export interface ApiErrorResponseSchema {
 
 export type Applicant = UpdateApplicantStageResponseSchema;
 
+export function matchesApplicantFilters(
+  applicant: Applicant,
+  nameQuery: string,
+  roles: readonly string[] = [],
+): boolean {
+  const normalizedNameQuery = nameQuery.trim().toLocaleLowerCase();
+  const matchesName = applicant.name
+    .toLocaleLowerCase()
+    .includes(normalizedNameQuery);
+  const matchesRole = roles.length === 0 || roles.includes(applicant.role);
+
+  return matchesName && matchesRole;
+}
+
+export function filterApplicants(
+  applicants: Applicant[],
+  nameQuery: string,
+  roles: readonly string[] = [],
+): Applicant[] {
+  return applicants.filter(function matchesFilters(applicant) {
+    return matchesApplicantFilters(applicant, nameQuery, roles);
+  });
+}
+
 export function paginateApplicants(
   applicants: Applicant[],
   page: number,
