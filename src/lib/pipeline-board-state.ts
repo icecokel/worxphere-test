@@ -17,6 +17,34 @@ interface ApplicantLocation {
   stage: Stage;
 }
 
+export function mergeApplicantPage(
+  currentApplicants: Applicant[],
+  pageApplicants: Applicant[],
+  page: number,
+): Applicant[] {
+  if (page === 1) {
+    return pageApplicants;
+  }
+
+  const loadedApplicantIds = new Set(
+    currentApplicants.map(function getApplicantId(applicant) {
+      return applicant.id;
+    }),
+  );
+  const newApplicants = pageApplicants.filter(
+    function excludeLoadedApplicant(applicant) {
+      if (loadedApplicantIds.has(applicant.id)) {
+        return false;
+      }
+
+      loadedApplicantIds.add(applicant.id);
+      return true;
+    },
+  );
+
+  return [...currentApplicants, ...newApplicants];
+}
+
 export function findApplicantLocation(
   boardState: PipelineBoardState,
   applicantId: string,
