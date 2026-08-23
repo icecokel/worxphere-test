@@ -1058,3 +1058,27 @@
 - 서류검토 `total/count/unique = 319/319/319`, 면접 `121/121/121`로 카드 수와 고유 ID 수가 API 합계와 일치하는지 확인했다.
 - `pnpm test:pre-push`의 lint, Node 테스트 5종과 프로덕션 빌드가 모두 통과했다.
 - `pnpm exec tsc --noEmit`, `git diff --check`를 통과했다.
+
+## [validation-api] API 단계 전이 규칙 검증
+
+### 프롬프트
+
+> 이슈 14를 위해 별도의 워크트리에서
+> fix/vaildation-api 브랜치 생성 후 작업
+
+### AI 출력 요지
+
+- UI에만 있던 단계 전이 규칙을 공통 도메인 함수로 옮겨 UI와 PATCH mock API가 같은 규칙을 사용하게 했다.
+- PATCH가 역행, 단계 건너뛰기, 동일 단계, 최종 상태 변경을 저장 전에 `400`으로 거부하도록 수정했다.
+- 허용된 6개 전이와 나머지 19개 거부 전이, API 검증 우선순위를 기존 단계 코드 검사에 추가했다.
+- 새 의존성이나 별도 테스트 프레임워크는 추가하지 않았다.
+
+### 리뷰 / 검증
+
+- Issue #14의 허용 전이와 거부 전이를 현재 UI 및 PATCH 핸들러 흐름과 대조했다.
+- 회귀 검사 추가 직후 `pnpm test:stage-code`가 공통 전이 함수 미구현으로 실패하고, 구현 후 전체 전이 매트릭스가 통과하는지 확인했다.
+- API 전이 검증이 임의 `500` 판정과 `localStorage` 저장보다 먼저 실행되는지 확인했다.
+- `3015` 포트의 실제 브라우저에서 `INTERVIEW → DOCUMENT_REVIEW` PATCH가 `400`을 반환하고 메모리 단계와 `localStorage`가 모두 유지되는지 확인했다.
+- `pnpm test:pre-push`의 lint, Node 테스트 5종과 프로덕션 빌드가 모두 통과했다.
+- 프로덕션 빌드가 Next 생성 타입을 만든 뒤 `pnpm exec tsc --noEmit`와 `git diff --check`를 통과했다.
+- Playwright 세션과 `3015` 서버를 종료하고 임시 검증 산출물을 휴지통으로 이동했다.
