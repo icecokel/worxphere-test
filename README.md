@@ -42,7 +42,7 @@ pnpm start
 
 ## 작업 규칙
 
-`pnpm install` 시 `.githooks`가 자동으로 활성화됩니다.
+`pnpm install` 시 Husky가 `.githooks`를 자동으로 활성화합니다. push 전에는 lint, 빠른 Node 테스트와 프로덕션 빌드를 실행합니다.
 
 - 기능 커밋은 `type(feature-key): 요약` 형식을 사용합니다.
 - 같은 `feature-key`의 기록을 `PROMPTS.md`에 포함해야 합니다.
@@ -55,5 +55,7 @@ pnpm test:filter
 pnpm test:keyboard
 pnpm test:pagination
 pnpm test:stage-code
+pnpm test:stage-move
+pnpm test:pre-push
 pnpm test:hooks
 ```

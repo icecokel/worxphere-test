@@ -15,7 +15,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Add or update the matching `## [feature-key]` section in `PROMPTS.md` in the same commit. Record the actual prompt, AI output summary, and actual review or verification.
 - Use the same key in behavioral commit subjects: `type(feature-key): Korean summary`.
 - Do not squash commits or use force-push. Preserve correction commits that show the verification process.
-- Keep `.githooks` enabled. Hooks enforce the prompt-log structure and block non-fast-forward pushes; the agent remains responsible for semantic feature boundaries and truthful review notes.
+- Keep the Husky-managed `.githooks` enabled. Hooks enforce the prompt-log structure, block non-fast-forward pushes, and run the pre-push checks; the agent remains responsible for semantic feature boundaries and truthful review notes.
 
 ## Coding Conventions
 

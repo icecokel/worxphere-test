@@ -12,7 +12,8 @@
     "test:pagination": "node --no-warnings --experimental-strip-types scripts/check-pipeline-pagination.mjs",
     "test:stage-code": "node --no-warnings --experimental-strip-types scripts/check-stage-code.mjs",
     "test:stage-move": "node --no-warnings --experimental-strip-types scripts/check-stage-move.mjs",
-    "prepare": "sh .githooks/install.sh",
+    "test:pre-push": "pnpm lint && pnpm test:filter && pnpm test:keyboard && pnpm test:pagination && pnpm test:stage-code && pnpm test:stage-move && pnpm build",
+    "prepare": "husky .githooks",
     "test:hooks": "sh .githooks/test-hooks.sh"
   },
   "dependencies": {
@@ -35,6 +36,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
+    "husky": "9.1.7",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

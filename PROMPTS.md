@@ -775,6 +775,30 @@
 - `1440×900`과 `1024×768`에서 상태 알림이 상세 패널과 겹치지 않고 화면 안에 표시되는지 확인했다.
 - 상세 패널이 열린 상태에서 `실행 취소` 버튼으로 확인 모달을 열고 `Escape`로 닫을 수 있는지 확인했다.
 
+## [husky-pre-push] Husky pre-push 검증
+
+### 프롬프트
+
+> 허스키 세팅하자.
+>
+> 프리 푸시 에
+>
+> 빌드 테스트등 간단한 테스트 진행되도록해줘
+
+### AI 출력 요지
+
+- Husky 9를 개발 의존성에 추가하고 기존 `.githooks`를 Husky의 사용자 지정 훅 디렉터리로 재사용했다.
+- `pre-push`에서 비 fast-forward 검사를 먼저 수행한 뒤 lint, 기존 Node 테스트 5개와 프로덕션 빌드를 실행하도록 했다.
+- 훅 테스트가 Husky 래퍼를 거쳐 실행되도록 변경하고 기존 설치 스크립트를 제거했다.
+- README와 AGENTS.md의 훅 안내를 Husky 구성에 맞게 갱신했다.
+
+### 리뷰 / 검증
+
+- `pnpm run prepare`를 실행하고 `core.hooksPath`가 `.githooks/_`로 설정되는지 확인했다.
+- `pnpm test:hooks`를 통과했으며, 이 과정에서 commit-msg·fast-forward 보호와 `pnpm test:pre-push` 전체 흐름을 검증했다.
+- `pnpm test:pre-push`에 포함된 lint, 필터·키보드·페이지네이션·단계 코드·단계 이동 테스트와 `pnpm build`가 모두 통과했다.
+- `git diff --check`를 통과했다.
+
 ## [phase-6-plan-sync] Phase 6 완료 상태와 검증 TC 동기화
 
 ### 프롬프트 1
