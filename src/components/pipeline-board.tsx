@@ -47,6 +47,11 @@ import {
   type Applicant,
   type GetApplicantsResponseSchema,
 } from "@/lib/pipeline";
+import {
+  findApplicantLocation,
+  moveApplicantToStage,
+  restoreApplicantStage,
+} from "@/lib/pipeline-board-state";
 
 const LOADING_CARD_KEYS = ["first", "second", "third"];
 const LOAD_MORE_THRESHOLD_PX = 160;
@@ -116,27 +121,6 @@ function createInitialBoardState(): PipelineBoardState {
   ) as PipelineBoardState;
 }
 
-function findApplicantLocation(
-  boardState: PipelineBoardState,
-  applicantId: string,
-): ApplicantLocation | undefined {
-  for (const stage of STAGES) {
-    const index = boardState[stage].applicants.findIndex(
-      function hasApplicantId(applicant) {
-        return applicant.id === applicantId;
-      },
-    );
-
-    if (index !== -1) {
-      return {
-        applicant: boardState[stage].applicants[index],
-        index,
-        stage,
-      };
-    }
-  }
-}
-
 function canChangeApplicantStage(
   currentStage: Stage,
   targetStage: Stage,
@@ -148,72 +132,10 @@ function canChangeApplicantStage(
   );
 }
 
-function moveApplicantToStage(
-  boardState: PipelineBoardState,
-  applicantId: string,
-  targetStage: Stage,
-): PipelineBoardState {
-  const location = findApplicantLocation(boardState, applicantId);
-
-  if (location === undefined || location.stage === targetStage) {
-    return boardState;
-  }
-
-  const sourceApplicants = boardState[location.stage].applicants.slice();
-  sourceApplicants.splice(location.index, 1);
-
-  return {
-    ...boardState,
-    [location.stage]: {
-      ...boardState[location.stage],
-      applicants: sourceApplicants,
-      total: boardState[location.stage].total - 1,
-    },
-    [targetStage]: {
-      ...boardState[targetStage],
-      applicants: [
-        ...boardState[targetStage].applicants,
-        { ...location.applicant, stage: targetStage },
-      ],
-      total: boardState[targetStage].total + 1,
-    },
-  };
-}
-
-function restoreApplicantStage(
-  boardState: PipelineBoardState,
-  applicantId: string,
-  sourceStage: Stage,
-  sourceIndex: number,
-): PipelineBoardState {
-  const location = findApplicantLocation(boardState, applicantId);
-
-  if (location === undefined || location.stage === sourceStage) {
-    return boardState;
-  }
-
-  const currentApplicants = boardState[location.stage].applicants.slice();
-  currentApplicants.splice(location.index, 1);
-
-  const sourceApplicants = boardState[sourceStage].applicants.slice();
-  sourceApplicants.splice(sourceIndex, 0, {
-    ...location.applicant,
-    stage: sourceStage,
+function focusApplicantCard(applicantId: string) {
+  window.requestAnimationFrame(function focusMovedApplicantCard() {
+    document.getElementById(`applicant-card-${applicantId}`)?.focus();
   });
-
-  return {
-    ...boardState,
-    [location.stage]: {
-      ...boardState[location.stage],
-      applicants: currentApplicants,
-      total: boardState[location.stage].total - 1,
-    },
-    [sourceStage]: {
-      ...boardState[sourceStage],
-      applicants: sourceApplicants,
-      total: boardState[sourceStage].total + 1,
-    },
-  };
 }
 
 async function fetchApplicants(

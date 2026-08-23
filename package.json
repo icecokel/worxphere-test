@@ -10,6 +10,7 @@
     "test:filter": "node --no-warnings --experimental-strip-types scripts/check-candidate-filter.mjs",
     "test:pagination": "node --no-warnings --experimental-strip-types scripts/check-pipeline-pagination.mjs",
     "test:stage-code": "node --no-warnings --experimental-strip-types scripts/check-stage-code.mjs",
+    "test:stage-move": "node --no-warnings --experimental-strip-types scripts/check-stage-move.mjs",
     "prepare": "sh .githooks/install.sh",
     "test:hooks": "sh .githooks/test-hooks.sh"
   },
