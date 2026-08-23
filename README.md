@@ -36,7 +36,7 @@ pnpm start
 
 단계 값은 `DOCUMENT_REVIEW`, `INTERVIEW`, `COMPENSATION_NEGOTIATION`, `HIRED`, `REJECTED`를 사용하며 한글 단계명은 화면에만 표시합니다.
 
-최종합격 지원자의 불합격 변경은 `400`으로 거부하며, 실패한 변경은 브라우저 저장소에 반영하지 않습니다.
+최종합격 지원자의 불합격 변경은 `400`으로 거부하며, 실패한 변경은 브라우저 저장소에 반영하지 않습니다. 목록 조회는 쿼리 검증 뒤, 단계 저장은 지원자 존재·요청 본문·단계 전이 검증 뒤에만 약 15%의 임의 `500`을 판정합니다.
 
 기능 요구사항은 [`docs/requirements.md`](docs/requirements.md)를 기준으로 합니다.
 
