@@ -925,7 +925,7 @@ export function PipelineBoard() {
                     >
                       {isSelectedApplicantSaving
                         ? "변경 중…"
-                        : "다음 단계로 변경"}
+                        : `${nextProgressStage} 단계로 변경`}
                     </Button>
                   </>
                 )}
