@@ -379,11 +379,22 @@ function PipelineColumn({
   isBoardEmpty: boolean;
   hasActiveFilters: boolean;
   onApplicantSelect: (applicantId: string) => void;
-  onLoadPage: (stage: Stage, page: number) => void;
+  onLoadPage: (
+    stage: Stage,
+    page: number,
+    preserveApplicants?: boolean,
+  ) => void;
 }) {
   const { applicants, total, nextPage, hasMore, isLoading, hasError } =
     columnState;
   const stageLabel = STAGE_LABELS[stage];
+  const hasApplicants = applicants.length > 0;
+  const isTotalUnknown = hasApplicants && nextPage === 1;
+  const errorMessage = hasApplicants
+    ? nextPage === 1
+      ? "일부 지원자를 불러오지 못했습니다."
+      : "추가 지원자를 불러오지 못했습니다."
+    : "지원자를 불러오지 못했습니다.";
 
   function renderApplicantCard(applicant: Applicant) {
     return (
@@ -396,7 +407,7 @@ function PipelineColumn({
   }
 
   function loadNextPage() {
-    onLoadPage(stage, nextPage);
+    onLoadPage(stage, nextPage, isTotalUnknown);
   }
 
   function handleColumnScroll(event: UIEvent<HTMLDivElement>) {
@@ -429,8 +440,11 @@ function PipelineColumn({
           />
           {stageLabel}
         </h2>
-        <span className="text-sm tabular-nums text-muted-foreground">
-          {total}
+        <span
+          aria-label={isTotalUnknown ? `${total}명 이상` : undefined}
+          className="text-sm tabular-nums text-muted-foreground"
+        >
+          {isTotalUnknown ? `${total}+` : total}
         </span>
       </header>
 
@@ -439,7 +453,7 @@ function PipelineColumn({
         className="min-h-0 flex-1 overflow-y-auto pr-1"
         onScroll={handleColumnScroll}
       >
-        {applicants.length > 0 ? (
+        {hasApplicants ? (
           <div className="space-y-3">
             {applicants.map(renderApplicantCard)}
             {isLoading ? <LoadingCard /> : null}
@@ -447,17 +461,21 @@ function PipelineColumn({
         ) : null}
 
         {hasError ? (
-          <div className="space-y-3 rounded-lg border border-dashed p-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              지원자를 불러오지 못했습니다.
-            </p>
+          <div
+            className={
+              hasApplicants
+                ? "mt-3 flex items-center justify-between gap-3 rounded-lg border border-dashed px-3 py-2"
+                : "space-y-3 rounded-lg border border-dashed p-4 text-center"
+            }
+          >
+            <p className="text-sm text-muted-foreground">{errorMessage}</p>
             <Button size="sm" variant="outline" onClick={loadNextPage}>
               다시 시도
             </Button>
           </div>
         ) : null}
 
-        {applicants.length === 0 && !hasError ? (
+        {!hasApplicants && !hasError ? (
           <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
             {hasActiveFilters
               ? "조건에 맞는 지원자가 없습니다."
@@ -480,7 +498,11 @@ function PipelineColumns({
   boardState: PipelineBoardState;
   hasActiveFilters: boolean;
   onApplicantSelect: (applicantId: string) => void;
-  onLoadPage: (stage: Stage, page: number) => void;
+  onLoadPage: (
+    stage: Stage,
+    page: number,
+    preserveApplicants?: boolean,
+  ) => void;
 }) {
   const isBoardEmpty = STAGES.every(function isStageEmpty(stage) {
     const columnState = boardState[stage];
@@ -732,6 +754,7 @@ export function PipelineBoard() {
   const loadStagePage = useCallback(function loadStagePage(
     stage: Stage,
     page: number,
+    preserveApplicants = false,
   ) {
     if (requestControllersRef.current.has(stage)) {
       return;
@@ -744,7 +767,7 @@ export function PipelineBoard() {
       return {
         ...currentState,
         [stage]:
-          page === 1
+          page === 1 && !preserveApplicants
             ? createInitialColumnState()
             : {
                 ...currentState[stage],
