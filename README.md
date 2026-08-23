@@ -56,6 +56,9 @@ pnpm test:keyboard
 pnpm test:pagination
 pnpm test:stage-code
 pnpm test:stage-move
+pnpm test:screens
 pnpm test:pre-push
 pnpm test:hooks
 ```
+
+`pnpm test:screens`는 프로덕션 Chromium에서 데스크톱 이름 검색·직무 필터를 무작위로 100회 확인하고 `docs/screens-test-report.md`를 갱신합니다. 모바일, Firefox와 WebKit은 실행하지 않습니다.

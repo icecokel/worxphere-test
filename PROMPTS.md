@@ -980,6 +980,36 @@
 - `pnpm test:filter`, `pnpm test:pagination`, `pnpm lint`, `pnpm build`, `git diff --check`를 통과했다.
 - Playwright 세션과 `35555` 서버를 종료하고 이번 검증의 임시 산출물을 휴지통으로 이동했다.
 
+## [screens-test] 에이전트 없는 무작위 화면 성능 테스트
+
+### 프롬프트
+
+> 1. play wright cli 시나리오 작성
+> 2. 화면별 브라우저별 테스트 안 적용
+> 3. 리포트 문서 작성되도록 play wright cli 작성
+>
+> 모바일은 진행하지 않는다.
+> 임의 100회
+>
+> 추후 에이전트 없이 테스트 할 수 있게 스크립트로 package.json에 적용
+
+### AI 출력 요지
+
+- 별도 Playwright 테스트 의존성 없이 `@playwright/cli`의 `run-code`를 호출하는 Node 스크립트를 추가했다.
+- Chromium에서 이름 검색과 직무 필터를 무작위 순서로 100회 실행하고, 두 요구 데스크톱 해상도와 두 시나리오에 성공 표본 25개씩을 보장했다.
+- 요청 시작, API, 마지막 응답 뒤 화면 반영과 Long Task를 측정하고 의도된 임의 `500`은 제외한 뒤 같은 조건을 재시도한다.
+- 실행 환경, 무작위 시드, 요약과 100개 상세 표본을 `docs/screens-test-report.md`에 자동 기록한다.
+- `pnpm test:screens`가 프로덕션 빌드, 서버 시작, CLI 실행, 리포트 생성과 서버·브라우저 정리를 한 번에 수행한다.
+- README에 실행 범위, 100회 조건과 리포트 경로를 기록했다.
+- Firefox, WebKit, 모바일과 화면별 브라우저 조합은 추가하지 않았다.
+
+### 리뷰 / 검증
+
+- `pnpm test:screens`에서 프로덕션 Chromium의 정상 응답 표본 `100/100`이 통과했고, 의도된 임의 `500` 표본 `118`건은 제외·재시도됐다.
+- `1024×768`, `1440×900`의 이름 검색·직무 필터를 각각 25회 확인했으며 최대 요청 시작 `28.6ms`, 최대 화면 반영 `38.0ms`, 최대 Long Task `0.0ms`를 기록했다.
+- 생성된 `docs/screens-test-report.md`에 실행 환경, 시드, 4개 그룹 요약과 상세 결과 100개가 기록됐는지 확인했다.
+- `pnpm test:pre-push`, `pnpm test:hooks`, `git diff --check`를 통과했다.
+
 ## [performance-requirement] 검색·필터 성능 합격 기준
 
 ### 프롬프트
