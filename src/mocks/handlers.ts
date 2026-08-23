@@ -2,6 +2,7 @@ import { delay, http, HttpResponse, type RequestHandler } from "msw";
 
 import {
   filterApplicants,
+  ROLES,
   paginateApplicants,
   Stage,
   STAGES,
@@ -72,13 +73,6 @@ const GIVEN_NAMES = [
   "다은",
   "우진",
   "소율",
-] as const;
-
-const ROLES = [
-  "프론트엔드 개발자",
-  "백엔드 개발자",
-  "프로덕트 디자이너",
-  "프로덕트 매니저",
 ] as const;
 
 const INITIAL_APPLICANTS = Array.from(

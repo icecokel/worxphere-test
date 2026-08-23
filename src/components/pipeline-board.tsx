@@ -40,6 +40,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   matchesApplicantFilters,
+  orderRoles,
   Stage,
   STAGE_LABELS,
   STAGES,
@@ -790,9 +791,7 @@ export function PipelineBoard() {
             nextRoles.add(applicant.role);
           });
 
-          return nextRoles.size === currentRoles.length
-            ? currentRoles
-            : Array.from(nextRoles);
+          return orderRoles(nextRoles);
         });
 
         setBoardState(function appendStageApplicants(currentState) {

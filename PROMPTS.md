@@ -558,6 +558,24 @@
 - GET 요청의 단계 파라미터가 `DOCUMENT_REVIEW`, `INTERVIEW`, `COMPENSATION_NEGOTIATION`, `HIRED`, `REJECTED`로 전송되는지 확인했다.
 - `서류검토 → 면접` 변경을 확정해 PATCH 본문이 `{ "stage": "INTERVIEW" }`이고 응답이 `200`인지 확인했다.
 
+## [role-order] 직무 필터 순서 고정
+
+### 프롬프트
+
+> 직무 순서가 일관되지 않는다.
+> 유저가 일관된 경험을 할 수 있도록 순서를 일관되게 변경한다.
+
+### AI 출력 요지
+
+- API 응답 완료 순서대로 누적되던 직무 목록을 고정된 직무 순서로 정렬했다.
+- mock 데이터와 화면이 같은 직무 목록을 사용하도록 공통 상수로 통합했다.
+- 정의되지 않은 직무는 누락하지 않고 고정 직무 뒤에 유지했다.
+
+### 리뷰 / 검증
+
+- `pnpm test:filter`, `pnpm lint`, `pnpm exec tsc --noEmit`, `git diff --check`를 통과했다.
+- Playwright에서 임의 API 지연이 적용된 화면을 3회 새로고침해 `프론트엔드 개발자 → 백엔드 개발자 → 프로덕트 디자이너 → 프로덕트 매니저` 순서가 유지되는지 확인했다.
+
 ## [partial-load-error] 부분 조회 실패 상태
 
 ### 프롬프트 1

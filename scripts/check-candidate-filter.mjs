@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 
 import {
   filterApplicants,
+  orderRoles,
   paginateApplicants,
+  ROLES,
   Stage,
 } from "../src/lib/pipeline.ts";
 
@@ -34,6 +36,16 @@ function createApplicant(_value, index) {
 }
 
 function checkCandidateFilter() {
+  assert.deepEqual(
+    orderRoles([
+      "프로덕트 매니저",
+      "백엔드 개발자",
+      "프론트엔드 개발자",
+      "프로덕트 디자이너",
+      "기타 직무",
+    ]),
+    [...ROLES, "기타 직무"],
+  );
   assert.deepEqual(filterApplicants(applicants, " 길 "), [applicants[0]]);
   assert.deepEqual(filterApplicants(applicants, "ALEX"), [applicants[1]]);
   assert.deepEqual(filterApplicants(applicants, "", ["백엔드 개발자"]), [

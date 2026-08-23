@@ -18,6 +18,13 @@ export const STAGE_LABELS: Record<Stage, string> = {
   [Stage.REJECTED]: "불합격",
 };
 
+export const ROLES = [
+  "프론트엔드 개발자",
+  "백엔드 개발자",
+  "프로덕트 디자이너",
+  "프로덕트 매니저",
+] as const;
+
 export const APPLICANTS_PAGE_SIZE = 100;
 
 export interface ApplicantSchema {
@@ -47,6 +54,21 @@ export interface ApiErrorResponseSchema {
 }
 
 export type Applicant = UpdateApplicantStageResponseSchema;
+
+export function orderRoles(roles: Iterable<string>): string[] {
+  const availableRoles = new Set(roles);
+  const orderedRoles: string[] = ROLES.filter(function keepAvailableRole(role) {
+    return availableRoles.has(role);
+  });
+
+  availableRoles.forEach(function appendUnknownRole(role) {
+    if (!orderedRoles.includes(role)) {
+      orderedRoles.push(role);
+    }
+  });
+
+  return orderedRoles;
+}
 
 export function matchesApplicantFilters(
   applicant: Applicant,
