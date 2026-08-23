@@ -29,7 +29,7 @@ pnpm start
 실제 백엔드 대신 브라우저 MSW를 사용하며 요청 핸들러는 `src/mocks/handlers.ts`에 정의합니다.
 
 - `GET /api/applicants?stage={stage}&page={page}&name={name}&role={role}`: 영문 단계 코드와 이름·직무 조건을 적용한 뒤 100건씩 조회
-- `PATCH /api/applicants/:id/stage`: `{ "stage": "INTERVIEW" }` 형식으로 단계 저장
+- `PATCH /api/applicants/:id/stage`: 일반 변경은 `{ "stage": "INTERVIEW" }`, 직전 비종료 단계 실행 취소는 `{ "stage": "DOCUMENT_REVIEW", "undo": true }` 형식으로 저장
 - 초기 데이터: 규칙으로 생성한 지원자 1,000건
 - 네트워크 조건: 요청마다 `200~800ms` 지연, 유효한 요청은 약 `15%` 확률로 실패
 - 저장 방식: 성공한 단계 변경만 브라우저 `localStorage`의 `worxphere.applicants.v4`에 저장해 새로고침 후 복원

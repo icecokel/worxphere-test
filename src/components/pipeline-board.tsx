@@ -171,11 +171,12 @@ async function fetchApplicants(
 async function updateApplicantStage(
   applicantId: string,
   stage: Stage,
+  isUndo = false,
 ): Promise<Applicant> {
   const response = await fetch(`/api/applicants/${applicantId}/stage`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ stage }),
+    body: JSON.stringify(isUndo ? { stage, undo: true } : { stage }),
   });
 
   if (!response.ok) {
@@ -645,7 +646,11 @@ export function PipelineBoard() {
     });
 
     try {
-      await updateApplicantStage(applicantId, targetStage);
+      await updateApplicantStage(
+        applicantId,
+        targetStage,
+        undoChange !== undefined,
+      );
 
       requestControllersRef.current.get(location.stage)?.abort();
       requestControllersRef.current.delete(location.stage);
@@ -814,7 +819,15 @@ export function PipelineBoard() {
   }
 
   function renderStageChangeStatus(isInDetail: boolean) {
-    if (!hasStageChangeError && recentStageChange === null) {
+    const isTerminalApplicantSelected =
+      selectedApplicant?.stage === Stage.HIRED ||
+      selectedApplicant?.stage === Stage.REJECTED;
+
+    if (
+      !hasStageChangeError &&
+      (recentStageChange === null ||
+        (isInDetail && isTerminalApplicantSelected))
+    ) {
       return null;
     }
 

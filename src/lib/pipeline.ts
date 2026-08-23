@@ -69,6 +69,7 @@ export interface ApplicantSchema {
 
 export interface UpdateApplicantStageRequestSchema {
   stage: Stage;
+  undo?: true;
 }
 
 export interface UpdateApplicantStageResponseSchema extends ApplicantSchema {
@@ -104,6 +105,17 @@ export function canChangeApplicantStage(
   return (
     (targetStage === Stage.REJECTED && nextStage !== null) ||
     nextStage === targetStage
+  );
+}
+
+export function canUndoApplicantStage(
+  currentStage: Stage,
+  targetStage: Stage,
+): boolean {
+  return (
+    currentStage !== Stage.HIRED &&
+    currentStage !== Stage.REJECTED &&
+    NEXT_PROGRESS_STAGES[targetStage] === currentStage
   );
 }
 
