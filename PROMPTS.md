@@ -1210,3 +1210,27 @@
 - `pnpm test:pre-push`의 lint, Node 테스트 5종과 프로덕션 빌드가 모두 통과했다.
 - 공유 `node_modules` 심볼릭 링크로 인한 Turbopack 외부 경로 오류는 워크트리 로컬 의존성 설치 후 재검증해 해소했다.
 - `git diff --check`를 통과했다.
+
+## [stage-undo-api] 실행 취소 API 계약 복구
+
+### 프롬프트
+
+> Audit GitHub Issue #20 and merged PR #21 end-to-end in the existing dedicated worktree `/Users/smlee/worxphere-test-issue-20`.
+> If you find a real gap, switch this worktree to a new branch `codex/issue-20-followup` from latest `origin/main`, implement only the fix, test, commit, push, and create a ready PR to main.
+
+### 후속 프롬프트
+
+> Keep ordinary backward transitions rejected; use the minimum explicit undo-only API contract, allow only the immediate reverse of a non-terminal transition, and add a runnable regression check proving normal backward PATCH=400 while explicit undo succeeds and terminal undo stays rejected.
+
+### AI 출력 요지
+
+- 최신 `main`의 UI가 실행 취소 PATCH를 보냈지만 API의 공통 단계 전이 검증이 모든 이전 단계 요청을 `400`으로 거부하는 회귀를 확인했다.
+- 일반 단계 변경 계약은 유지하고 `undo: true`를 명시한 요청만 바로 이전 비종료 단계로 복구하도록 공통 계약, mock API와 UI 호출을 맞췄다.
+- 최종합격·불합격 실행 취소와 명시되지 않은 이전 단계 변경은 계속 `400`으로 거부한다.
+- 다른 지원자의 실행 취소 기록은 유지하되 최종합격·불합격 지원자 상세를 연 동안에는 실행 취소 상태 카드를 숨겼다.
+
+### 리뷰 / 검증
+
+- 수정 전 port `3004` 브라우저에서 전진 PATCH `200` 뒤 실행 취소 PATCH가 세 번 연속 `400`으로 거부되는 것을 재현했다.
+- `pnpm test:stage-code`에 일반 이전 단계 거부, 두 비종료 단계의 명시적 실행 취소 허용과 종료 단계 실행 취소 거부 회귀 검사를 추가했다.
+- `pnpm test:pre-push`, port `3004` 브라우저의 실행 취소 성공·실패 롤백·새로고침 유지와 최종합격·불합격 상세의 실행 취소 숨김, `git diff --check`를 검증했다.

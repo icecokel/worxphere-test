@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 import {
   canChangeApplicantStage,
+  canUndoApplicantStage,
   Stage,
   STAGE_LABELS,
   STAGES,
@@ -42,6 +43,37 @@ function checkStageTransitions() {
   }
 }
 
+function checkUndoStageTransitions() {
+  assert.equal(
+    canChangeApplicantStage(Stage.INTERVIEW, Stage.DOCUMENT_REVIEW),
+    false,
+    "ordinary backward PATCH must remain rejected with 400",
+  );
+  assert.equal(
+    canUndoApplicantStage(Stage.INTERVIEW, Stage.DOCUMENT_REVIEW),
+    true,
+    "explicit undo must allow the immediate non-terminal reverse",
+  );
+  assert.equal(
+    canUndoApplicantStage(
+      Stage.COMPENSATION_NEGOTIATION,
+      Stage.INTERVIEW,
+    ),
+    true,
+    "explicit undo must allow the latest compensation transition",
+  );
+  assert.equal(
+    canUndoApplicantStage(Stage.HIRED, Stage.COMPENSATION_NEGOTIATION),
+    false,
+    "terminal transitions must not be undoable",
+  );
+  assert.equal(
+    canUndoApplicantStage(Stage.REJECTED, Stage.INTERVIEW),
+    false,
+    "rejected transitions must not be undoable",
+  );
+}
+
 function checkApiValidationPriority() {
   const source = readFileSync(
     new URL("../src/mocks/handlers.ts", import.meta.url),
@@ -51,19 +83,24 @@ function checkApiValidationPriority() {
     source.indexOf("async function updateApplicantStageResolver"),
     source.indexOf("export const handlers"),
   );
-  const validationIndex = resolver.indexOf("canChangeApplicantStage(");
+  const explicitUndoIndex = resolver.indexOf("body.undo === true");
+  const undoValidationIndex = resolver.indexOf("canUndoApplicantStage(");
+  const normalValidationIndex = resolver.indexOf("canChangeApplicantStage(");
   const invalidTransitionIndex = resolver.indexOf(
     'return errorResponse("허용되지 않은 단계 변경입니다.", 400);',
   );
   const randomFailureIndex = resolver.indexOf("if (shouldFail())");
   const persistenceIndex = resolver.indexOf("localStorage.setItem(");
 
-  assert.ok(validationIndex >= 0);
-  assert.ok(invalidTransitionIndex > validationIndex);
+  assert.ok(explicitUndoIndex >= 0);
+  assert.ok(undoValidationIndex > explicitUndoIndex);
+  assert.ok(normalValidationIndex > explicitUndoIndex);
+  assert.ok(invalidTransitionIndex > normalValidationIndex);
   assert.ok(randomFailureIndex > invalidTransitionIndex);
   assert.ok(persistenceIndex > invalidTransitionIndex);
 }
 
 checkStageCode();
 checkStageTransitions();
+checkUndoStageTransitions();
 checkApiValidationPriority();

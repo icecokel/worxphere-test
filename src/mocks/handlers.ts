@@ -2,6 +2,7 @@ import { delay, http, HttpResponse, type RequestHandler } from "msw";
 
 import {
   canChangeApplicantStage,
+  canUndoApplicantStage,
   filterApplicants,
   ROLES,
   paginateApplicants,
@@ -164,7 +165,11 @@ function findApplicantIndex(id: string): number {
 function isUpdateApplicantStageRequest(
   value: unknown,
 ): value is UpdateApplicantStageRequestSchema {
-  return isRecord(value) && isStage(value.stage);
+  return (
+    isRecord(value) &&
+    isStage(value.stage) &&
+    (value.undo === undefined || value.undo === true)
+  );
 }
 
 function getRandomDelay(): number {
@@ -260,12 +265,13 @@ async function updateApplicantStageResolver({
     return errorResponse("허용되지 않은 채용 단계입니다.", 400);
   }
 
-  if (
-    !canChangeApplicantStage(
-      getApplicants()[applicantIndex].stage,
-      body.stage,
-    )
-  ) {
+  const currentStage = getApplicants()[applicantIndex].stage;
+  const isAllowed =
+    body.undo === true
+      ? canUndoApplicantStage(currentStage, body.stage)
+      : canChangeApplicantStage(currentStage, body.stage);
+
+  if (!isAllowed) {
     return errorResponse("허용되지 않은 단계 변경입니다.", 400);
   }
 
