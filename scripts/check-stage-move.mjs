@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { Stage, STAGES } from "../src/lib/pipeline.ts";
@@ -174,5 +175,34 @@ test("SM-05 keeps moved pagination unique and complete", function checkMovedPagi
       return applicant.id;
     }),
     [targetApplicant.id, movedApplicant.id, nextTargetApplicant.id],
+  );
+});
+
+test("SM-06 keeps filters and both actions locked while saving", function checkSavingUiLock() {
+  const source = readFileSync(
+    new URL("../src/components/pipeline-board.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    source,
+    /!areFiltersReady \|\| savingApplicantIds\.size > 0/,
+  );
+  assert.match(
+    source,
+    /function handleNameQueryChange[\s\S]*?savingApplicantIdsRef\.current\.size > 0/,
+  );
+  assert.match(
+    source,
+    /function handleRoleCheckedChange[\s\S]*?savingApplicantIdsRef\.current\.size > 0/,
+  );
+  assert.equal(source.match(/<Button disabled>변경 중…<\/Button>/g)?.length, 1);
+  assert.match(
+    source,
+    /selectedApplicant\.stage !== Stage\.HIRED \|\|\s*isSelectedApplicantSaving/,
+  );
+  assert.match(
+    source,
+    /disabled=\{!canRejectApplicant \|\| isSelectedApplicantSaving\}[\s\S]*?isSelectedApplicantSaving \? "변경 중…" : "불합격 처리"/,
   );
 });

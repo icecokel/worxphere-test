@@ -543,7 +543,7 @@ export function PipelineBoard() {
 
   const hasActiveFilters = nameQuery.trim() !== "" || selectedRoles !== null;
 
-  const areFiltersDisabled = !areFiltersReady;
+  const areFiltersDisabled = !areFiltersReady || savingApplicantIds.size > 0;
   const isSelectedApplicantSaving =
     selectedApplicant !== undefined &&
     savingApplicantIds.has(selectedApplicant.id);
@@ -580,12 +580,20 @@ export function PipelineBoard() {
   }
 
   function handleNameQueryChange(event: ChangeEvent<HTMLInputElement>) {
+    if (savingApplicantIdsRef.current.size > 0) {
+      return;
+    }
+
     const nextNameQuery = event.currentTarget.value;
     setNameQuery(nextNameQuery);
     closeDetailWhenApplicantIsHidden(nextNameQuery, selectedRoles);
   }
 
   function handleRoleCheckedChange(role: string, checked: boolean) {
+    if (savingApplicantIdsRef.current.size > 0) {
+      return;
+    }
+
     const currentSelectedRoles = selectedRoles ?? availableRoles;
     const nextSelectedRoles = checked
       ? [...currentSelectedRoles, role]
@@ -1125,7 +1133,17 @@ export function PipelineBoard() {
                 >
                   다음 채용 단계
                 </h3>
-                {nextProgressStage === null ? (
+                {isSelectedApplicantSaving ? (
+                  <>
+                    <p
+                      className="text-sm text-muted-foreground"
+                      role="status"
+                    >
+                      단계 변경을 저장하고 있습니다.
+                    </p>
+                    <Button disabled>변경 중…</Button>
+                  </>
+                ) : nextProgressStage === null ? (
                   <p className="text-sm text-muted-foreground">
                     다음 채용 단계가 없습니다.
                   </p>
@@ -1135,18 +1153,13 @@ export function PipelineBoard() {
                       다음 채용 단계는 {STAGE_LABELS[nextProgressStage]}입니다.
                       단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다.
                     </p>
-                    <Button
-                      disabled={isSelectedApplicantSaving}
-                      onClick={handleNextProgressStageChange}
-                    >
-                      {isSelectedApplicantSaving
-                        ? "변경 중…"
-                        : `${STAGE_LABELS[nextProgressStage]} 단계로 변경`}
+                    <Button onClick={handleNextProgressStageChange}>
+                      {STAGE_LABELS[nextProgressStage]} 단계로 변경
                     </Button>
                   </>
                 )}
               </section>
-              {selectedApplicant.stage !== Stage.HIRED ? (
+              {selectedApplicant.stage !== Stage.HIRED || isSelectedApplicantSaving ? (
                 <section
                   aria-labelledby="rejection-stage-heading"
                   className="grid gap-3 border-t pt-6"
@@ -1158,7 +1171,9 @@ export function PipelineBoard() {
                     불합격 처리
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {canRejectApplicant
+                    {isSelectedApplicantSaving
+                      ? "단계 변경을 저장하는 동안 불합격 처리할 수 없습니다."
+                      : canRejectApplicant
                       ? "정규 진행 중에는 불합격 처리할 수 있습니다. 처리 전에 내용을 확인해 주세요."
                       : "이미 불합격 처리된 지원자입니다."}
                   </p>
