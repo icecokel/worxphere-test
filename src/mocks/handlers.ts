@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse, type RequestHandler } from "msw";
 
 import {
+  paginateApplicants,
   STAGES,
   type ApiErrorResponseSchema,
   type Applicant,
@@ -189,16 +190,31 @@ function errorResponse(error: string, status: number) {
   return HttpResponse.json<ApiErrorResponseSchema>({ error }, { status });
 }
 
-async function getApplicantsResolver() {
+async function getApplicantsResolver({ request }: { request: Request }) {
   await delay(getRandomDelay());
 
   if (shouldFail()) {
     return errorResponse("지원자를 불러오지 못했습니다.", 500);
   }
 
-  const response: GetApplicantsResponseSchema = {
-    applicants: getApplicants(),
-  };
+  const searchParams = new URL(request.url).searchParams;
+  const requestedStage = searchParams.get("stage");
+  const page = Number(searchParams.get("page") ?? "1");
+
+  if (
+    (requestedStage !== null && !isStage(requestedStage)) ||
+    !Number.isInteger(page) ||
+    page < 1
+  ) {
+    return errorResponse("페이지 요청이 올바르지 않습니다.", 400);
+  }
+
+  const stageApplicants = requestedStage
+    ? getApplicants().filter(function matchesRequestedStage(applicant) {
+        return applicant.stage === requestedStage;
+      })
+    : getApplicants();
+  const response = paginateApplicants(stageApplicants, page);
 
   return HttpResponse.json<GetApplicantsResponseSchema>(response);
 }

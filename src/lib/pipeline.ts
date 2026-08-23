@@ -6,6 +6,8 @@ export const STAGES = [
   "불합격",
 ] as const;
 
+export const APPLICANTS_PAGE_SIZE = 100;
+
 export type Stage = (typeof STAGES)[number];
 
 export interface ApplicantSchema {
@@ -25,6 +27,9 @@ export interface UpdateApplicantStageResponseSchema extends ApplicantSchema {
 
 export interface GetApplicantsResponseSchema {
   applicants: UpdateApplicantStageResponseSchema[];
+  total: number;
+  page: number;
+  hasMore: boolean;
 }
 
 export interface ApiErrorResponseSchema {
@@ -32,3 +37,18 @@ export interface ApiErrorResponseSchema {
 }
 
 export type Applicant = UpdateApplicantStageResponseSchema;
+
+export function paginateApplicants(
+  applicants: Applicant[],
+  page: number,
+): GetApplicantsResponseSchema {
+  const start = (page - 1) * APPLICANTS_PAGE_SIZE;
+  const end = start + APPLICANTS_PAGE_SIZE;
+
+  return {
+    applicants: applicants.slice(start, end),
+    total: applicants.length,
+    page,
+    hasMore: end < applicants.length,
+  };
+}
