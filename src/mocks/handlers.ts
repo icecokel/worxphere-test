@@ -3,21 +3,21 @@ import { delay, http, HttpResponse, type RequestHandler } from "msw";
 import {
   filterApplicants,
   paginateApplicants,
+  Stage,
   STAGES,
   type ApiErrorResponseSchema,
   type Applicant,
   type GetApplicantsResponseSchema,
-  type Stage,
   type UpdateApplicantStageRequestSchema,
   type UpdateApplicantStageResponseSchema,
 } from "@/lib/pipeline";
 
 const STAGE_APPLICANT_COUNTS: Record<Stage, number> = {
-  서류검토: 320,
-  면접: 120,
-  처우협의: 30,
-  최종합격: 50,
-  불합격: 480,
+  [Stage.DOCUMENT_REVIEW]: 320,
+  [Stage.INTERVIEW]: 120,
+  [Stage.COMPENSATION_NEGOTIATION]: 30,
+  [Stage.HIRED]: 50,
+  [Stage.REJECTED]: 480,
 };
 const INITIAL_APPLICANT_STAGES = STAGES.flatMap(
   function createApplicantStages(stage) {
@@ -25,7 +25,7 @@ const INITIAL_APPLICANT_STAGES = STAGES.flatMap(
   },
 );
 const APPLICANT_COUNT = INITIAL_APPLICANT_STAGES.length;
-const APPLICANTS_STORAGE_KEY = "worxphere.applicants.v2";
+const APPLICANTS_STORAGE_KEY = "worxphere.applicants.v3";
 const FAILURE_RATE = 0.15;
 const MIN_DELAY_MS = 200;
 const MAX_DELAY_MS = 800;
@@ -267,8 +267,8 @@ async function updateApplicantStageResolver({
   }
 
   if (
-    getApplicants()[applicantIndex].stage === "최종합격" &&
-    body.stage === "불합격"
+    getApplicants()[applicantIndex].stage === Stage.HIRED &&
+    body.stage === Stage.REJECTED
   ) {
     return errorResponse("최종합격한 지원자는 불합격 처리할 수 없습니다.", 400);
   }

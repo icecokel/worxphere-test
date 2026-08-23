@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { paginateApplicants } from "../src/lib/pipeline.ts";
+import { paginateApplicants, Stage } from "../src/lib/pipeline.ts";
 
 function createApplicant(_value, index) {
   return {
@@ -8,7 +8,7 @@ function createApplicant(_value, index) {
     name: `지원자 ${index + 1}`,
     role: "프론트엔드 개발자",
     appliedAt: "2026-08-23T00:00:00.000Z",
-    stage: "서류검토",
+    stage: Stage.DOCUMENT_REVIEW,
   };
 }
 

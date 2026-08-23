@@ -40,10 +40,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   matchesApplicantFilters,
+  Stage,
+  STAGE_LABELS,
   STAGES,
   type Applicant,
   type GetApplicantsResponseSchema,
-  type Stage,
 } from "@/lib/pipeline";
 
 const LOADING_CARD_KEYS = ["first", "second", "third"];
@@ -53,19 +54,19 @@ const STAGE_CHANGE_ERROR_MESSAGE =
   "단계 변경에 실패했습니다. 다시 시도해 주세요.";
 
 const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
-  서류검토: "bg-chart-1",
-  면접: "bg-chart-2",
-  처우협의: "bg-chart-3",
-  최종합격: "bg-chart-4",
-  불합격: "bg-chart-5",
+  [Stage.DOCUMENT_REVIEW]: "bg-chart-1",
+  [Stage.INTERVIEW]: "bg-chart-2",
+  [Stage.COMPENSATION_NEGOTIATION]: "bg-chart-3",
+  [Stage.HIRED]: "bg-chart-4",
+  [Stage.REJECTED]: "bg-chart-5",
 };
 
 const NEXT_PROGRESS_STAGES: Record<Stage, Stage | null> = {
-  서류검토: "면접",
-  면접: "처우협의",
-  처우협의: "최종합격",
-  최종합격: null,
-  불합격: null,
+  [Stage.DOCUMENT_REVIEW]: Stage.INTERVIEW,
+  [Stage.INTERVIEW]: Stage.COMPENSATION_NEGOTIATION,
+  [Stage.COMPENSATION_NEGOTIATION]: Stage.HIRED,
+  [Stage.HIRED]: null,
+  [Stage.REJECTED]: null,
 };
 
 interface StageColumnState {
@@ -132,7 +133,7 @@ function canChangeApplicantStage(
   targetStage: Stage,
 ): boolean {
   return (
-    (targetStage === "불합격" &&
+    (targetStage === Stage.REJECTED &&
       NEXT_PROGRESS_STAGES[currentStage] !== null) ||
     NEXT_PROGRESS_STAGES[currentStage] === targetStage
   );
@@ -287,7 +288,7 @@ function ApplicantCard({
         </CardHeader>
         <CardContent className="space-y-1 text-muted-foreground">
           <p>지원일 {formatAppliedAt(applicant.appliedAt)}</p>
-          <p>현재 단계 {applicant.stage}</p>
+          <p>현재 단계 {STAGE_LABELS[applicant.stage]}</p>
         </CardContent>
       </Card>
     </button>
@@ -310,6 +311,8 @@ function LoadingCard() {
 }
 
 function LoadingColumn({ stage }: { stage: Stage }) {
+  const stageLabel = STAGE_LABELS[stage];
+
   function renderLoadingCard(cardKey: string) {
     return <LoadingCard key={cardKey} />;
   }
@@ -320,7 +323,7 @@ function LoadingColumn({ stage }: { stage: Stage }) {
       className="flex h-full w-72 shrink-0 flex-col gap-3 rounded-xl bg-muted/50 p-3"
     >
       <header className="flex items-center justify-between gap-3">
-        <span className="text-sm font-medium">{stage}</span>
+        <span className="text-sm font-medium">{stageLabel}</span>
         <Skeleton className="size-5 rounded-full" />
       </header>
       <div className="space-y-3 overflow-hidden">
@@ -380,6 +383,7 @@ function PipelineColumn({
 }) {
   const { applicants, total, nextPage, hasMore, isLoading, hasError } =
     columnState;
+  const stageLabel = STAGE_LABELS[stage];
 
   function renderApplicantCard(applicant: Applicant) {
     return (
@@ -423,7 +427,7 @@ function PipelineColumn({
             aria-hidden="true"
             className={`size-2 rounded-full ${STAGE_DOT_CLASS_NAMES[stage]}`}
           />
-          {stage}
+          {stageLabel}
         </h2>
         <span className="text-sm tabular-nums text-muted-foreground">
           {total}
@@ -431,7 +435,7 @@ function PipelineColumn({
       </header>
 
       <div
-        aria-label={`${stage} 지원자 목록`}
+        aria-label={`${stageLabel} 지원자 목록`}
         className="min-h-0 flex-1 overflow-y-auto pr-1"
         onScroll={handleColumnScroll}
       >
@@ -563,7 +567,7 @@ export function PipelineBoard() {
     selectedApplicant !== undefined &&
     NEXT_PROGRESS_STAGES[selectedApplicant.stage] !== null;
   const isStageChangeConfirmationOpen = pendingStage !== null;
-  const isRejectionPending = pendingStage === "불합격";
+  const isRejectionPending = pendingStage === Stage.REJECTED;
 
   function closeDetailWhenApplicantIsHidden(
     nextNameQuery: string,
@@ -678,7 +682,7 @@ export function PipelineBoard() {
   }
 
   function handleApplicantRejection() {
-    requestSelectedApplicantStageChange("불합격");
+    requestSelectedApplicantStageChange(Stage.REJECTED);
   }
 
   function handleStageChangeConfirmationOpenChange(isOpen: boolean) {
@@ -923,7 +927,7 @@ export function PipelineBoard() {
                 </div>
                 <div className="grid gap-1">
                   <dt className="text-sm text-muted-foreground">현재 단계</dt>
-                  <dd>{selectedApplicant.stage}</dd>
+                  <dd>{STAGE_LABELS[selectedApplicant.stage]}</dd>
                 </div>
               </dl>
               <section
@@ -943,7 +947,7 @@ export function PipelineBoard() {
                 ) : (
                   <>
                     <p className="text-sm text-muted-foreground">
-                      다음 채용 단계는 {nextProgressStage}입니다.
+                      다음 채용 단계는 {STAGE_LABELS[nextProgressStage]}입니다.
                       단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다.
                     </p>
                     <Button
@@ -952,12 +956,12 @@ export function PipelineBoard() {
                     >
                       {isSelectedApplicantSaving
                         ? "변경 중…"
-                        : `${nextProgressStage} 단계로 변경`}
+                        : `${STAGE_LABELS[nextProgressStage]} 단계로 변경`}
                     </Button>
                   </>
                 )}
               </section>
-              {selectedApplicant.stage !== "최종합격" ? (
+              {selectedApplicant.stage !== Stage.HIRED ? (
                 <section
                   aria-labelledby="rejection-stage-heading"
                   className="grid gap-3 border-t pt-6"
@@ -1000,8 +1004,8 @@ export function PipelineBoard() {
             <AlertDialogDescription>
               {selectedApplicant !== undefined && pendingStage !== null
                 ? isRejectionPending
-                  ? `${selectedApplicant.name} 지원자를 불합격 처리합니다. 현재 단계는 ${selectedApplicant.stage}입니다.`
-                  : `${selectedApplicant.name} 지원자의 단계를 ${selectedApplicant.stage}에서 ${pendingStage} 단계로 변경합니다.`
+                  ? `${selectedApplicant.name} 지원자를 불합격 처리합니다. 현재 단계는 ${STAGE_LABELS[selectedApplicant.stage]}입니다.`
+                  : `${selectedApplicant.name} 지원자의 단계를 ${STAGE_LABELS[selectedApplicant.stage]}에서 ${STAGE_LABELS[pendingStage]} 단계로 변경합니다.`
                 : "단계 변경 내용을 확인해 주세요."}
               <br />
               단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다.
@@ -1015,7 +1019,7 @@ export function PipelineBoard() {
             >
               {isRejectionPending
                 ? "불합격 처리"
-                : `${pendingStage} 단계로 변경`}
+                : `${pendingStage === null ? "" : STAGE_LABELS[pendingStage]} 단계로 변경`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

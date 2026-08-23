@@ -538,3 +538,22 @@
 - Phase 5의 미구현 Should 목록과 `DECISIONS.md`의 보류 사유를 변경하지 않고 후속 계획으로 연결했다.
 - 새 기능, 라이브러리와 범위 밖 ATS 기능을 계획에 추가하지 않았다.
 - 각 구현 항목이 별도 feature-key와 커밋으로 분리되는지 확인했다.
+
+## [stage-code] 채용 단계 영문 전송 코드
+
+### 프롬프트
+
+> 상태 값을 이넘화해서, 한글로 송부하지 않도록개선
+
+### AI 출력 요지
+
+- 채용 단계를 영문 문자열 코드 상수로 정의하고 한글 단계명은 화면 라벨 매핑으로 분리했다.
+- 목록 조회 파라미터, 단계 변경 요청·응답과 브라우저 저장소가 영문 코드를 사용하도록 변경했다.
+- 저장 스키마 변경에 맞춰 브라우저 저장 키를 `v3`로 올리고 API 계약 문서와 검증 스크립트를 갱신했다.
+
+### 리뷰 / 검증
+
+- `pnpm test:stage-code`, `pnpm test:filter`, `pnpm test:pagination`, `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm build`, `git diff --check`를 통과했다.
+- 브라우저에서 컬럼·카드·상세 패널·확인 모달의 단계명이 한글로 유지되는지 확인했다.
+- GET 요청의 단계 파라미터가 `DOCUMENT_REVIEW`, `INTERVIEW`, `COMPENSATION_NEGOTIATION`, `HIRED`, `REJECTED`로 전송되는지 확인했다.
+- `서류검토 → 면접` 변경을 확정해 PATCH 본문이 `{ "stage": "INTERVIEW" }`이고 응답이 `200`인지 확인했다.

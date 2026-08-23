@@ -185,7 +185,12 @@ flowchart TB
 화면이 사용하는 최소 데이터는 다음과 같다.
 
 ```ts
-type Stage = "서류검토" | "면접" | "처우협의" | "최종합격" | "불합격";
+type Stage =
+  | "DOCUMENT_REVIEW"
+  | "INTERVIEW"
+  | "COMPENSATION_NEGOTIATION"
+  | "HIRED"
+  | "REJECTED";
 
 type Applicant = {
   id: string;
@@ -196,10 +201,12 @@ type Applicant = {
 };
 ```
 
+API는 영문 단계 코드를 사용하고 화면은 각각 `서류검토`, `면접`, `처우협의`, `최종합격`, `불합격`으로 표시한다.
+
 - 목록 조회: `GET /api/applicants?stage={stage}&page={page}&name={name}&role={role}`
 - `name`과 반복 가능한 `role`은 선택 조건이며, 이름 부분 일치·선택 직무 OR·단계 조건을 적용한 뒤 100건씩 페이지네이션한다.
 - 단계 저장: `PATCH /api/applicants/:id/stage`
-- 단계 저장 요청 본문: `{ "stage": "면접" }`
+- 단계 저장 요청 본문: `{ "stage": "INTERVIEW" }`
 - 최종합격 지원자를 불합격으로 변경하려는 요청은 `400` 응답으로 거부한다.
 - 모든 mock API 요청에는 `200~800ms` 지연을 적용한다.
 - 요청은 약 `15%` 확률로 실패하게 한다.

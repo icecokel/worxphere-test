@@ -1,14 +1,24 @@
-export const STAGES = [
-  "서류검토",
-  "면접",
-  "처우협의",
-  "최종합격",
-  "불합격",
-] as const;
+export const Stage = {
+  DOCUMENT_REVIEW: "DOCUMENT_REVIEW",
+  INTERVIEW: "INTERVIEW",
+  COMPENSATION_NEGOTIATION: "COMPENSATION_NEGOTIATION",
+  HIRED: "HIRED",
+  REJECTED: "REJECTED",
+} as const;
+
+export type Stage = (typeof Stage)[keyof typeof Stage];
+
+export const STAGES: readonly Stage[] = Object.values(Stage);
+
+export const STAGE_LABELS: Record<Stage, string> = {
+  [Stage.DOCUMENT_REVIEW]: "서류검토",
+  [Stage.INTERVIEW]: "면접",
+  [Stage.COMPENSATION_NEGOTIATION]: "처우협의",
+  [Stage.HIRED]: "최종합격",
+  [Stage.REJECTED]: "불합격",
+};
 
 export const APPLICANTS_PAGE_SIZE = 100;
-
-export type Stage = (typeof STAGES)[number];
 
 export interface ApplicantSchema {
   id: string;
