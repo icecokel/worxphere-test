@@ -12,6 +12,7 @@
     "test:pagination": "node --no-warnings --experimental-strip-types scripts/check-pipeline-pagination.mjs",
     "test:stage-code": "node --no-warnings --experimental-strip-types scripts/check-stage-code.mjs",
     "test:stage-move": "node --no-warnings --experimental-strip-types scripts/check-stage-move.mjs",
+    "test:screens": "pnpm build && node scripts/run-screens-test.mjs",
     "test:pre-push": "pnpm lint && pnpm test:filter && pnpm test:keyboard && pnpm test:pagination && pnpm test:stage-code && pnpm test:stage-move && pnpm build",
     "prepare": "husky .githooks",
     "test:hooks": "sh .githooks/test-hooks.sh"
