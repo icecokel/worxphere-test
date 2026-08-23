@@ -672,6 +672,30 @@
 - `pnpm test:stage-move` 통과: 4개 테스트, 실패 0건.
 - 사용자 요청 범위에 따라 `pnpm lint`와 `pnpm build`는 아직 실행하지 않았다.
 
+## [stage-move-build] Node 테스트용 TS import 빌드 호환
+
+### 프롬프트 1
+
+> 빌드 테스트
+
+### 프롬프트 2
+
+> 원인 분석
+
+### 프롬프트 3
+
+> 수정해줘
+
+### AI 출력 요지
+
+- Node ESM이 요구하는 명시적 `.ts` import를 유지하면서 Next.js TypeScript 검사도 허용하도록 `allowImportingTsExtensions`를 활성화했다.
+- 별도 빌드 설정이나 테스트 러너 변경은 추가하지 않았다.
+
+### 리뷰 / 검증
+
+- `pnpm test:stage-move` 통과: 4개 테스트, 실패 0건.
+- `pnpm exec tsc --noEmit`, `pnpm build`, `git diff --check`를 통과했다.
+
 ## [applicant-uuid] 지원자 UUID 적용
 
 ### 프롬프트
