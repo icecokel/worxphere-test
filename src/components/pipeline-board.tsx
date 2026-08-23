@@ -10,6 +10,16 @@ import {
   useState,
 } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,6 +48,9 @@ import {
 
 const LOADING_CARD_KEYS = ["first", "second", "third"];
 const LOAD_MORE_THRESHOLD_PX = 160;
+const STAGE_CHANGE_ERROR_DURATION_MS = 5_000;
+const STAGE_CHANGE_ERROR_MESSAGE =
+  "단계 변경에 실패했습니다. 다시 시도해 주세요.";
 
 const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
   서류검토: "bg-chart-1",
@@ -45,6 +58,14 @@ const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
   처우협의: "bg-chart-3",
   최종합격: "bg-chart-4",
   불합격: "bg-chart-5",
+};
+
+const NEXT_PROGRESS_STAGES: Record<Stage, Stage | null> = {
+  서류검토: "면접",
+  면접: "처우협의",
+  처우협의: "최종합격",
+  최종합격: null,
+  불합격: null,
 };
 
 interface StageColumnState {
@@ -57,6 +78,12 @@ interface StageColumnState {
 }
 
 type PipelineBoardState = Record<Stage, StageColumnState>;
+
+interface ApplicantLocation {
+  applicant: Applicant;
+  index: number;
+  stage: Stage;
+}
 
 function createInitialColumnState(): StageColumnState {
   return {
@@ -77,6 +104,106 @@ function createInitialBoardState(): PipelineBoardState {
   return Object.fromEntries(
     STAGES.map(createInitialStageEntry),
   ) as PipelineBoardState;
+}
+
+function findApplicantLocation(
+  boardState: PipelineBoardState,
+  applicantId: string,
+): ApplicantLocation | undefined {
+  for (const stage of STAGES) {
+    const index = boardState[stage].applicants.findIndex(
+      function hasApplicantId(applicant) {
+        return applicant.id === applicantId;
+      },
+    );
+
+    if (index !== -1) {
+      return {
+        applicant: boardState[stage].applicants[index],
+        index,
+        stage,
+      };
+    }
+  }
+}
+
+function canChangeApplicantStage(
+  currentStage: Stage,
+  targetStage: Stage,
+): boolean {
+  return (
+    (targetStage === "불합격" &&
+      NEXT_PROGRESS_STAGES[currentStage] !== null) ||
+    NEXT_PROGRESS_STAGES[currentStage] === targetStage
+  );
+}
+
+function moveApplicantToStage(
+  boardState: PipelineBoardState,
+  applicantId: string,
+  targetStage: Stage,
+): PipelineBoardState {
+  const location = findApplicantLocation(boardState, applicantId);
+
+  if (location === undefined || location.stage === targetStage) {
+    return boardState;
+  }
+
+  const sourceApplicants = boardState[location.stage].applicants.slice();
+  sourceApplicants.splice(location.index, 1);
+
+  return {
+    ...boardState,
+    [location.stage]: {
+      ...boardState[location.stage],
+      applicants: sourceApplicants,
+      total: boardState[location.stage].total - 1,
+    },
+    [targetStage]: {
+      ...boardState[targetStage],
+      applicants: [
+        ...boardState[targetStage].applicants,
+        { ...location.applicant, stage: targetStage },
+      ],
+      total: boardState[targetStage].total + 1,
+    },
+  };
+}
+
+function restoreApplicantStage(
+  boardState: PipelineBoardState,
+  applicantId: string,
+  sourceStage: Stage,
+  sourceIndex: number,
+): PipelineBoardState {
+  const location = findApplicantLocation(boardState, applicantId);
+
+  if (location === undefined || location.stage === sourceStage) {
+    return boardState;
+  }
+
+  const currentApplicants = boardState[location.stage].applicants.slice();
+  currentApplicants.splice(location.index, 1);
+
+  const sourceApplicants = boardState[sourceStage].applicants.slice();
+  sourceApplicants.splice(sourceIndex, 0, {
+    ...location.applicant,
+    stage: sourceStage,
+  });
+
+  return {
+    ...boardState,
+    [location.stage]: {
+      ...boardState[location.stage],
+      applicants: currentApplicants,
+      total: boardState[location.stage].total - 1,
+    },
+    [sourceStage]: {
+      ...boardState[sourceStage],
+      applicants: sourceApplicants,
+      total: boardState[sourceStage].total + 1,
+    },
+  };
 }
 
 async function fetchApplicants(
@@ -114,6 +241,23 @@ async function fetchApplicants(
   return (await response.json()) as GetApplicantsResponseSchema;
 }
 
+async function updateApplicantStage(
+  applicantId: string,
+  stage: Stage,
+): Promise<Applicant> {
+  const response = await fetch(`/api/applicants/${applicantId}/stage`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stage }),
+  });
+
+  if (!response.ok) {
+    throw new Error("지원자 단계 변경 실패");
+  }
+
+  return (await response.json()) as Applicant;
+}
+
 function formatAppliedAt(appliedAt: string): string {
   return appliedAt.slice(0, 10).replaceAll("-", ".");
 }
@@ -133,7 +277,7 @@ function ApplicantCard({
     <button
       type="button"
       aria-label={`${applicant.name} 지원자 상세 보기`}
-      className="block w-full rounded-xl text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="block w-full cursor-pointer rounded-xl text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       onClick={handleSelect}
     >
       <Card size="sm">
@@ -268,7 +412,7 @@ function PipelineColumn({
   return (
     <section
       aria-labelledby={`stage-${stage}`}
-      className="flex h-full w-72 shrink-0 flex-col gap-3 rounded-xl bg-muted/50 p-3"
+      className="flex h-full w-72 shrink-0 flex-col gap-3 rounded-xl border border-transparent bg-muted/50 p-3"
     >
       <header className="flex shrink-0 items-center justify-between gap-3">
         <h2
@@ -372,6 +516,13 @@ export function PipelineBoard() {
   const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(
     null,
   );
+  const [pendingStage, setPendingStage] = useState<Stage | null>(null);
+  const [savingApplicantIds, setSavingApplicantIds] = useState<Set<string>>(
+    function createEmptySavingApplicantIds() {
+      return new Set();
+    },
+  );
+  const [hasStageChangeError, setHasStageChangeError] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [areFiltersReady, setAreFiltersReady] = useState(false);
   const requestControllersRef = useRef(new Map<Stage, AbortController>());
@@ -401,6 +552,18 @@ export function PipelineBoard() {
   const hasActiveFilters = nameQuery.trim() !== "" || selectedRoles !== null;
 
   const areFiltersDisabled = !areFiltersReady;
+  const isSelectedApplicantSaving =
+    selectedApplicant !== undefined &&
+    savingApplicantIds.has(selectedApplicant.id);
+  const nextProgressStage =
+    selectedApplicant === undefined
+      ? null
+      : NEXT_PROGRESS_STAGES[selectedApplicant.stage];
+  const canRejectApplicant =
+    selectedApplicant !== undefined &&
+    NEXT_PROGRESS_STAGES[selectedApplicant.stage] !== null;
+  const isStageChangeConfirmationOpen = pendingStage !== null;
+  const isRejectionPending = pendingStage === "불합격";
 
   function closeDetailWhenApplicantIsHidden(
     nextNameQuery: string,
@@ -445,7 +608,103 @@ export function PipelineBoard() {
   }
 
   function handleApplicantSelect(applicantId: string) {
+    const location = findApplicantLocation(boardState, applicantId);
+
+    if (location === undefined) {
+      return;
+    }
+
     setSelectedApplicantId(applicantId);
+  }
+
+  async function saveApplicantStageChange(
+    applicantId: string,
+    targetStage: Stage,
+  ) {
+    const location = findApplicantLocation(boardState, applicantId);
+
+    if (
+      location === undefined ||
+      !canChangeApplicantStage(location.stage, targetStage) ||
+      savingApplicantIds.has(applicantId)
+    ) {
+      return;
+    }
+
+    setSavingApplicantIds(function markApplicantSaving(currentIds) {
+      return new Set(currentIds).add(applicantId);
+    });
+    setBoardState(function showOptimisticStage(currentState) {
+      return moveApplicantToStage(currentState, applicantId, targetStage);
+    });
+
+    try {
+      await updateApplicantStage(applicantId, targetStage);
+    } catch {
+      setBoardState(function rollbackApplicantStage(currentState) {
+        return restoreApplicantStage(
+          currentState,
+          applicantId,
+          location.stage,
+          location.index,
+        );
+      });
+      setHasStageChangeError(true);
+    } finally {
+      setSavingApplicantIds(function clearApplicantSaving(currentIds) {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(applicantId);
+        return nextIds;
+      });
+    }
+  }
+
+  function requestSelectedApplicantStageChange(targetStage: Stage) {
+    if (
+      selectedApplicant === undefined ||
+      !canChangeApplicantStage(selectedApplicant.stage, targetStage) ||
+      isSelectedApplicantSaving
+    ) {
+      return;
+    }
+
+    setPendingStage(targetStage);
+  }
+
+  function handleNextProgressStageChange() {
+    if (nextProgressStage !== null) {
+      requestSelectedApplicantStageChange(nextProgressStage);
+    }
+  }
+
+  function handleApplicantRejection() {
+    requestSelectedApplicantStageChange("불합격");
+  }
+
+  function handleStageChangeConfirmationOpenChange(isOpen: boolean) {
+    if (!isOpen) {
+      setPendingStage(null);
+    }
+  }
+
+  function handleStageChangeConfirmation() {
+    const targetStage = pendingStage;
+
+    if (
+      selectedApplicant === undefined ||
+      targetStage === null ||
+      !canChangeApplicantStage(selectedApplicant.stage, targetStage)
+    ) {
+      setPendingStage(null);
+      return;
+    }
+
+    setPendingStage(null);
+    void saveApplicantStageChange(selectedApplicant.id, targetStage);
+  }
+
+  function handleStageChangeErrorClose() {
+    setHasStageChangeError(false);
   }
 
   function handleDetailOpenChange(isOpen: boolean) {
@@ -572,6 +831,24 @@ export function PipelineBoard() {
     [loadStagePage],
   );
 
+  useEffect(
+    function dismissStageChangeError() {
+      if (!hasStageChangeError) {
+        return;
+      }
+
+      const timeoutId = window.setTimeout(
+        handleStageChangeErrorClose,
+        STAGE_CHANGE_ERROR_DURATION_MS,
+      );
+
+      return function clearStageChangeErrorTimeout() {
+        window.clearTimeout(timeoutId);
+      };
+    },
+    [hasStageChangeError],
+  );
+
   return (
     <main className="flex h-svh min-w-0 flex-col gap-4 p-6">
       <header className="shrink-0">
@@ -649,10 +926,119 @@ export function PipelineBoard() {
                   <dd>{selectedApplicant.stage}</dd>
                 </div>
               </dl>
+              <section
+                aria-labelledby="next-progress-stage-heading"
+                className="grid gap-3"
+              >
+                <h3
+                  id="next-progress-stage-heading"
+                  className="text-sm font-medium"
+                >
+                  다음 채용 단계
+                </h3>
+                {nextProgressStage === null ? (
+                  <p className="text-sm text-muted-foreground">
+                    다음 채용 단계가 없습니다.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      다음 채용 단계는 {nextProgressStage}입니다.
+                      단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다.
+                    </p>
+                    <Button
+                      disabled={isSelectedApplicantSaving}
+                      onClick={handleNextProgressStageChange}
+                    >
+                      {isSelectedApplicantSaving
+                        ? "변경 중…"
+                        : `${nextProgressStage} 단계로 변경`}
+                    </Button>
+                  </>
+                )}
+              </section>
+              {selectedApplicant.stage !== "최종합격" ? (
+                <section
+                  aria-labelledby="rejection-stage-heading"
+                  className="grid gap-3 border-t pt-6"
+                >
+                  <h3
+                    id="rejection-stage-heading"
+                    className="text-sm font-medium"
+                  >
+                    불합격 처리
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {canRejectApplicant
+                      ? "정규 진행 중에는 불합격 처리할 수 있습니다. 처리 전에 내용을 확인해 주세요."
+                      : "이미 불합격 처리된 지원자입니다."}
+                  </p>
+                  <Button
+                    variant="destructive"
+                    disabled={!canRejectApplicant || isSelectedApplicantSaving}
+                    onClick={handleApplicantRejection}
+                  >
+                    {isSelectedApplicantSaving ? "변경 중…" : "불합격 처리"}
+                  </Button>
+                </section>
+              ) : null}
             </div>
           ) : null}
         </SheetContent>
       </Sheet>
+      <AlertDialog
+        open={isStageChangeConfirmationOpen}
+        onOpenChange={handleStageChangeConfirmationOpenChange}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRejectionPending
+                ? "불합격 처리 확인"
+                : "채용 단계 변경 확인"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedApplicant !== undefined && pendingStage !== null
+                ? isRejectionPending
+                  ? `${selectedApplicant.name} 지원자를 불합격 처리합니다. 현재 단계는 ${selectedApplicant.stage}입니다.`
+                  : `${selectedApplicant.name} 지원자의 단계를 ${selectedApplicant.stage}에서 ${pendingStage} 단계로 변경합니다.`
+                : "단계 변경 내용을 확인해 주세요."}
+              <br />
+              단계 변경에 따라 지원자에게 알림이 발송될 수 있습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              variant={isRejectionPending ? "destructive" : "default"}
+              onClick={handleStageChangeConfirmation}
+            >
+              {isRejectionPending
+                ? "불합격 처리"
+                : `${pendingStage} 단계로 변경`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {hasStageChangeError ? (
+        <Card
+          role="alert"
+          size="sm"
+          className="fixed right-6 bottom-6 z-50 max-w-sm"
+        >
+          <CardContent className="flex items-center gap-3">
+            <p>{STAGE_CHANGE_ERROR_MESSAGE}</p>
+            <Button
+              className="ml-auto"
+              size="sm"
+              variant="outline"
+              onClick={handleStageChangeErrorClose}
+            >
+              닫기
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
     </main>
   );
 }

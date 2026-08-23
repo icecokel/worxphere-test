@@ -266,6 +266,13 @@ async function updateApplicantStageResolver({
     return errorResponse("허용되지 않은 채용 단계입니다.", 400);
   }
 
+  if (
+    getApplicants()[applicantIndex].stage === "최종합격" &&
+    body.stage === "불합격"
+  ) {
+    return errorResponse("최종합격한 지원자는 불합격 처리할 수 없습니다.", 400);
+  }
+
   if (shouldFail()) {
     return errorResponse("단계 변경에 실패했습니다.", 500);
   }
