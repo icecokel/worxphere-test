@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { Stage, STAGES } from "../src/lib/pipeline.ts";
 import {
+  mergeApplicantPage,
   moveApplicantToStage,
   restoreApplicantStage,
 } from "../src/lib/pipeline-board-state.ts";
@@ -133,5 +134,45 @@ test("SM-04 ignores a request for the current stage", function checkSameStage() 
       0,
     ),
     board,
+  );
+});
+
+test("SM-05 keeps moved pagination unique and complete", function checkMovedPagination() {
+  const sourceApplicant = createApplicant(
+    "source",
+    Stage.DOCUMENT_REVIEW,
+  );
+  const shiftedSourceApplicant = createApplicant(
+    "shifted-source",
+    Stage.DOCUMENT_REVIEW,
+  );
+  const movedApplicant = createApplicant("moved", Stage.INTERVIEW);
+  const targetApplicant = createApplicant("target", Stage.INTERVIEW);
+  const nextTargetApplicant = createApplicant(
+    "next-target",
+    Stage.INTERVIEW,
+  );
+  const loadedSourceApplicants = mergeApplicantPage(
+    [sourceApplicant],
+    [sourceApplicant, shiftedSourceApplicant],
+    1,
+  );
+  const loadedTargetApplicants = mergeApplicantPage(
+    [targetApplicant, movedApplicant],
+    [targetApplicant, nextTargetApplicant],
+    2,
+  );
+
+  assert.deepEqual(
+    loadedSourceApplicants.map(function getSourceId(applicant) {
+      return applicant.id;
+    }),
+    [sourceApplicant.id, shiftedSourceApplicant.id],
+  );
+  assert.deepEqual(
+    loadedTargetApplicants.map(function getTargetId(applicant) {
+      return applicant.id;
+    }),
+    [targetApplicant.id, movedApplicant.id, nextTargetApplicant.id],
   );
 });

@@ -1033,3 +1033,28 @@
 - 수정 전 `pnpm test:pagination`에서 새 우선순위 검사가 실패하고, 수정 후 같은 검사가 통과하는지 확인했다.
 - `pnpm test:pre-push`의 lint, Node 테스트 5종과 프로덕션 빌드가 모두 통과했다.
 - `git diff --check`를 통과했다.
+
+## [stage-move-pagination] 단계 이동 후 페이지네이션 정합성 복구
+
+### 프롬프트
+
+> 1. `fix/stage-move-pagination`
+> 2. 수정
+> 3. 커밋푸시
+> 4. maim <- PR
+
+### AI 출력 요지
+
+- 단계 저장 성공 시 오프셋이 당겨진 원본 컬럼의 진행 중 요청을 취소하고, 현재 카드를 보존한 채 1페이지부터 다시 동기화했다.
+- 대상 컬럼의 다음 페이지 응답은 이미 표시한 지원자 `id`를 제외하고 합쳐 이동 카드와 서버 페이지가 겹쳐도 중복되지 않게 했다.
+- 필터가 변경되는 동안 PATCH가 완료돼도 최신 조회 조건을 사용하도록 현재 페이지 로더를 ref로 유지했다.
+- 양쪽 컬럼 전체 초기화와 새 의존성은 추가하지 않았다.
+
+### 리뷰 / 검증
+
+- `moveApplicantToStage`, `restoreApplicantStage`, `saveApplicantStageChange`, `loadStagePage`의 호출·응답 흐름을 대조해 저장 성공 뒤 기존 `nextPage`를 유지한 것이 누락·중복의 원인인지 확인했다.
+- 회귀 검사 추가 직후 `pnpm test:stage-move`가 `mergeApplicantPage` 미구현으로 실패하고, 수정 후 기존 4건과 신규 `SM-05`까지 5건이 통과하는지 확인했다.
+- Playwright에서 임의 실패를 비활성화한 결정적 조건으로 `김민준`을 `서류검토 → 면접` 이동한 뒤 두 컬럼의 남은 페이지를 모두 불러왔다.
+- 서류검토 `total/count/unique = 319/319/319`, 면접 `121/121/121`로 카드 수와 고유 ID 수가 API 합계와 일치하는지 확인했다.
+- `pnpm test:pre-push`의 lint, Node 테스트 5종과 프로덕션 빌드가 모두 통과했다.
+- `pnpm exec tsc --noEmit`, `git diff --check`를 통과했다.

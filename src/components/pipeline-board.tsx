@@ -51,6 +51,7 @@ import {
 } from "@/lib/pipeline";
 import {
   findApplicantLocation,
+  mergeApplicantPage,
   moveApplicantToStage,
   restoreApplicantStage,
 } from "@/lib/pipeline-board-state";
@@ -664,6 +665,10 @@ export function PipelineBoard() {
     try {
       await updateApplicantStage(applicantId, targetStage);
 
+      requestControllersRef.current.get(location.stage)?.abort();
+      requestControllersRef.current.delete(location.stage);
+      loadStagePageRef.current(location.stage, 1, true);
+
       if (undoChange !== undefined) {
         setRecentStageChange(function clearUndoneStageChange(currentChange) {
           return currentChange === undoChange ? null : currentChange;
@@ -912,8 +917,16 @@ export function PipelineBoard() {
       return {
         ...currentState,
         [stage]:
-          page === 1 && !preserveApplicants
-            ? createInitialColumnState()
+          page === 1
+            ? preserveApplicants
+              ? {
+                  ...currentState[stage],
+                  nextPage: 1,
+                  hasMore: true,
+                  isLoading: true,
+                  hasError: false,
+                }
+              : createInitialColumnState()
             : {
                 ...currentState[stage],
                 isLoading: true,
@@ -940,10 +953,11 @@ export function PipelineBoard() {
 
         setBoardState(function appendStageApplicants(currentState) {
           const currentColumn = currentState[stage];
-          const applicants =
-            page === 1
-              ? response.applicants
-              : [...currentColumn.applicants, ...response.applicants];
+          const applicants = mergeApplicantPage(
+            currentColumn.applicants,
+            response.applicants,
+            page,
+          );
 
           return {
             ...currentState,
@@ -982,6 +996,15 @@ export function PipelineBoard() {
         }
       });
   }, [nameQuery, selectedRoles]);
+
+  const loadStagePageRef = useRef(loadStagePage);
+
+  useEffect(
+    function keepLatestStagePageLoader() {
+      loadStagePageRef.current = loadStagePage;
+    },
+    [loadStagePage],
+  );
 
   useEffect(
     function loadInitialApplicants() {
