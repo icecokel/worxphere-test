@@ -26,9 +26,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   filterApplicants,
+  matchesApplicantFilters,
   STAGES,
   type Applicant,
   type GetApplicantsResponseSchema,
@@ -101,18 +109,35 @@ function formatAppliedAt(appliedAt: string): string {
   return appliedAt.slice(0, 10).replaceAll("-", ".");
 }
 
-function ApplicantCard({ applicant }: { applicant: Applicant }) {
+function ApplicantCard({
+  applicant,
+  onSelect,
+}: {
+  applicant: Applicant;
+  onSelect: (applicantId: string) => void;
+}) {
+  function handleSelect() {
+    onSelect(applicant.id);
+  }
+
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>{applicant.name}</CardTitle>
-        <CardDescription>{applicant.role}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-1 text-muted-foreground">
-        <p>지원일 {formatAppliedAt(applicant.appliedAt)}</p>
-        <p>현재 단계 {applicant.stage}</p>
-      </CardContent>
-    </Card>
+    <button
+      type="button"
+      aria-label={`${applicant.name} 지원자 상세 보기`}
+      className="block w-full rounded-xl text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      onClick={handleSelect}
+    >
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>{applicant.name}</CardTitle>
+          <CardDescription>{applicant.role}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-1 text-muted-foreground">
+          <p>지원일 {formatAppliedAt(applicant.appliedAt)}</p>
+          <p>현재 단계 {applicant.stage}</p>
+        </CardContent>
+      </Card>
+    </button>
   );
 }
 
@@ -157,19 +182,27 @@ function PipelineColumn({
   columnState,
   isBoardEmpty,
   hasActiveFilters,
+  onApplicantSelect,
   onLoadPage,
 }: {
   stage: Stage;
   columnState: StageColumnState;
   isBoardEmpty: boolean;
   hasActiveFilters: boolean;
+  onApplicantSelect: (applicantId: string) => void;
   onLoadPage: (stage: Stage, page: number) => void;
 }) {
   const { applicants, total, nextPage, hasMore, isLoading, hasError } =
     columnState;
 
   function renderApplicantCard(applicant: Applicant) {
-    return <ApplicantCard key={applicant.id} applicant={applicant} />;
+    return (
+      <ApplicantCard
+        key={applicant.id}
+        applicant={applicant}
+        onSelect={onApplicantSelect}
+      />
+    );
   }
 
   function loadNextPage() {
@@ -251,10 +284,12 @@ function PipelineColumn({
 function PipelineColumns({
   boardState,
   hasActiveFilters,
+  onApplicantSelect,
   onLoadPage,
 }: {
   boardState: PipelineBoardState;
   hasActiveFilters: boolean;
+  onApplicantSelect: (applicantId: string) => void;
   onLoadPage: (stage: Stage, page: number) => void;
 }) {
   const isBoardEmpty = STAGES.every(function isStageEmpty(stage) {
@@ -274,6 +309,7 @@ function PipelineColumns({
         columnState={boardState[stage]}
         isBoardEmpty={isBoardEmpty}
         hasActiveFilters={hasActiveFilters}
+        onApplicantSelect={onApplicantSelect}
         onLoadPage={onLoadPage}
       />
     );
@@ -291,6 +327,9 @@ export function PipelineBoard() {
     useState<PipelineBoardState>(createInitialBoardState);
   const [nameQuery, setNameQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState(ALL_ROLES_VALUE);
+  const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(
+    null,
+  );
   const requestControllersRef = useRef(new Map<Stage, AbortController>());
 
   const loadedApplicants = useMemo(
@@ -300,6 +339,19 @@ export function PipelineBoard() {
       });
     },
     [boardState],
+  );
+
+  const selectedApplicant = useMemo(
+    function findSelectedApplicant() {
+      if (selectedApplicantId === null) {
+        return undefined;
+      }
+
+      return loadedApplicants.find(function hasSelectedApplicantId(applicant) {
+        return applicant.id === selectedApplicantId;
+      });
+    },
+    [loadedApplicants, selectedApplicantId],
   );
 
   const availableRoles = useMemo(
@@ -351,12 +403,47 @@ export function PipelineBoard() {
     return columnState.isLoading && columnState.applicants.length === 0;
   });
 
+  function closeDetailWhenApplicantIsHidden(
+    nextNameQuery: string,
+    nextSelectedRole: string,
+  ) {
+    if (selectedApplicant === undefined) {
+      return;
+    }
+
+    const role =
+      nextSelectedRole === ALL_ROLES_VALUE ? undefined : nextSelectedRole;
+    const isVisible = matchesApplicantFilters(
+      selectedApplicant,
+      nextNameQuery,
+      role,
+    );
+
+    if (!isVisible) {
+      setSelectedApplicantId(null);
+    }
+  }
+
   function handleNameQueryChange(event: ChangeEvent<HTMLInputElement>) {
-    setNameQuery(event.currentTarget.value);
+    const nextNameQuery = event.currentTarget.value;
+    setNameQuery(nextNameQuery);
+    closeDetailWhenApplicantIsHidden(nextNameQuery, selectedRole);
   }
 
   function handleRoleChange(role: string | null) {
-    setSelectedRole(role ?? ALL_ROLES_VALUE);
+    const nextSelectedRole = role ?? ALL_ROLES_VALUE;
+    setSelectedRole(nextSelectedRole);
+    closeDetailWhenApplicantIsHidden(nameQuery, nextSelectedRole);
+  }
+
+  function handleApplicantSelect(applicantId: string) {
+    setSelectedApplicantId(applicantId);
+  }
+
+  function handleDetailOpenChange(isOpen: boolean) {
+    if (!isOpen) {
+      setSelectedApplicantId(null);
+    }
   }
 
   function renderRoleOption(role: string) {
@@ -501,9 +588,45 @@ export function PipelineBoard() {
         <PipelineColumns
           boardState={visibleBoardState}
           hasActiveFilters={hasActiveFilters}
+          onApplicantSelect={handleApplicantSelect}
           onLoadPage={loadStagePage}
         />
       </div>
+      <Sheet
+        open={selectedApplicant !== undefined}
+        onOpenChange={handleDetailOpenChange}
+      >
+        <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-[420px]">
+          <SheetHeader>
+            <SheetTitle>지원자 상세</SheetTitle>
+            <SheetDescription className="sr-only">
+              선택한 지원자의 필수 정보
+            </SheetDescription>
+          </SheetHeader>
+          {selectedApplicant ? (
+            <div className="grid gap-6 px-4 pb-4">
+              <div className="space-y-1">
+                <p className="text-lg font-semibold">
+                  {selectedApplicant.name}
+                </p>
+                <p className="text-muted-foreground">
+                  {selectedApplicant.role}
+                </p>
+              </div>
+              <dl className="grid gap-4">
+                <div className="grid gap-1">
+                  <dt className="text-sm text-muted-foreground">지원일</dt>
+                  <dd>{formatAppliedAt(selectedApplicant.appliedAt)}</dd>
+                </div>
+                <div className="grid gap-1">
+                  <dt className="text-sm text-muted-foreground">현재 단계</dt>
+                  <dd>{selectedApplicant.stage}</dd>
+                </div>
+              </dl>
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
     </main>
   );
 }

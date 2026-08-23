@@ -38,20 +38,27 @@ export interface ApiErrorResponseSchema {
 
 export type Applicant = UpdateApplicantStageResponseSchema;
 
+export function matchesApplicantFilters(
+  applicant: Applicant,
+  nameQuery: string,
+  role?: string,
+): boolean {
+  const normalizedNameQuery = nameQuery.trim().toLocaleLowerCase();
+  const matchesName = applicant.name
+    .toLocaleLowerCase()
+    .includes(normalizedNameQuery);
+  const matchesRole = role === undefined || applicant.role === role;
+
+  return matchesName && matchesRole;
+}
+
 export function filterApplicants(
   applicants: Applicant[],
   nameQuery: string,
   role?: string,
 ): Applicant[] {
-  const normalizedNameQuery = nameQuery.trim().toLocaleLowerCase();
-
-  return applicants.filter(function matchesApplicantFilters(applicant) {
-    const matchesName = applicant.name
-      .toLocaleLowerCase()
-      .includes(normalizedNameQuery);
-    const matchesRole = role === undefined || applicant.role === role;
-
-    return matchesName && matchesRole;
+  return applicants.filter(function matchesFilters(applicant) {
+    return matchesApplicantFilters(applicant, nameQuery, role);
   });
 }
 
