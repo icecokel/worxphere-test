@@ -1059,6 +1059,40 @@
 - `pnpm test:pre-push`의 lint, Node 테스트 5종과 프로덕션 빌드가 모두 통과했다.
 - `pnpm exec tsc --noEmit`, `git diff --check`를 통과했다.
 
+## [card-key] 지원자 카드 복합 key 적용
+
+### 프롬프트
+
+> `${index}-${id}`
+>
+> 형태로 수정하자
+>
+> 1. fix/card-key 브랜치 생성, 작업
+> 2. 커밋 푸시
+> 3. main <- PR
+> 4. 이슈 상세히 기재후 클로즈
+
+### 후속 프롬프트
+
+> 머지 안된다 충돌 해결
+
+### AI 출력 요지
+
+- 지원자 카드 목록의 React key를 지원자 `id`에서 배열 위치와 ID를 결합한 `${index}-${applicant.id}`로 변경했다.
+- 지원자 선택과 페이지 응답 중복 제거는 안정적인 도메인 식별자인 `applicant.id`를 계속 사용하고, 복합 값은 React 형제 key에만 적용했다.
+- 카드가 로컬 상태를 갖지 않아 목록 순서 변경 시 재마운트되는 비용을 허용하고, 중복 ID 입력에서도 key 충돌 경고가 발생하지 않게 했다.
+- `origin/main`의 API 단계 전이 검증 변경을 병합하고 양쪽 프롬프트 기록을 모두 보존했다.
+
+### 리뷰 / 검증
+
+- `rg`로 지원자 카드 렌더링 경로가 `applicants.map(renderApplicantCard)` 한 곳인지 확인했다.
+- `pnpm test:pre-push`의 lint, Node 테스트 5종과 프로덕션 빌드가 모두 통과했다.
+- `pnpm exec tsc --noEmit`, `git diff --check`를 통과했다.
+- 프로덕션 브라우저에서 mock 저장소 1,000건 중 서류검토 지원자 2명의 ID를 같게 만든 뒤 첫 페이지 카드 100개가 렌더링되는지 확인했다.
+- 같은 ID 입력에서 콘솔 오류, 페이지 오류와 React 중복 key 경고가 모두 0건임을 확인하고 테스트 저장소를 제거했다.
+- `origin/main` 병합 뒤 공통 `canChangeApplicantStage` 사용과 `${index}-${applicant.id}` key가 함께 유지되고 충돌 표식이 남지 않았는지 확인했다.
+- 충돌 해소 상태에서 `pnpm test:pre-push`의 전체 검사와 프로덕션 빌드를 다시 통과했다.
+
 ## [validation-api] API 단계 전이 규칙 검증
 
 ### 프롬프트
