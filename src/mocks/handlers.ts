@@ -26,7 +26,7 @@ const INITIAL_APPLICANT_STAGES = STAGES.flatMap(
   },
 );
 const APPLICANT_COUNT = INITIAL_APPLICANT_STAGES.length;
-const APPLICANTS_STORAGE_KEY = "worxphere.applicants.v3";
+const APPLICANTS_STORAGE_KEY = "worxphere.applicants.v4";
 const FAILURE_RATE = 0.15;
 const MIN_DELAY_MS = 200;
 const MAX_DELAY_MS = 800;
@@ -83,13 +83,12 @@ const INITIAL_APPLICANTS = Array.from(
 let applicants: Applicant[] | undefined;
 
 function createApplicant(_value: unknown, index: number): Applicant {
-  const sequence = String(index + 1).padStart(4, "0");
   const surname = SURNAMES[index % SURNAMES.length];
   const givenName =
     GIVEN_NAMES[Math.floor(index / SURNAMES.length) % GIVEN_NAMES.length];
 
   return {
-    id: `applicant-${sequence}`,
+    id: crypto.randomUUID(),
     name: `${surname}${givenName}`,
     role: ROLES[index % ROLES.length],
     appliedAt: new Date(

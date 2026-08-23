@@ -10,6 +10,31 @@ export type Stage = (typeof Stage)[keyof typeof Stage];
 
 export const STAGES: readonly Stage[] = Object.values(Stage);
 
+export type StageArrowKey = "ArrowLeft" | "ArrowRight";
+
+const KEYBOARD_STAGE_TARGETS: Record<
+  Stage,
+  Record<StageArrowKey, Stage | null>
+> = {
+  [Stage.DOCUMENT_REVIEW]: {
+    ArrowLeft: null,
+    ArrowRight: Stage.INTERVIEW,
+  },
+  [Stage.INTERVIEW]: {
+    ArrowLeft: Stage.DOCUMENT_REVIEW,
+    ArrowRight: Stage.COMPENSATION_NEGOTIATION,
+  },
+  [Stage.COMPENSATION_NEGOTIATION]: {
+    ArrowLeft: Stage.INTERVIEW,
+    ArrowRight: Stage.HIRED,
+  },
+  [Stage.HIRED]: {
+    ArrowLeft: Stage.COMPENSATION_NEGOTIATION,
+    ArrowRight: Stage.REJECTED,
+  },
+  [Stage.REJECTED]: { ArrowLeft: Stage.HIRED, ArrowRight: null },
+};
+
 export const STAGE_LABELS: Record<Stage, string> = {
   [Stage.DOCUMENT_REVIEW]: "서류검토",
   [Stage.INTERVIEW]: "면접",
@@ -54,6 +79,13 @@ export interface ApiErrorResponseSchema {
 }
 
 export type Applicant = UpdateApplicantStageResponseSchema;
+
+export function getKeyboardStageTarget(
+  stage: Stage,
+  key: StageArrowKey,
+): Stage | null {
+  return KEYBOARD_STAGE_TARGETS[stage][key];
+}
 
 export function orderRoles(roles: Iterable<string>): string[] {
   const availableRoles = new Set(roles);
