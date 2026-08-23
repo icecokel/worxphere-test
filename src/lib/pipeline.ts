@@ -28,8 +28,11 @@ const KEYBOARD_STAGE_TARGETS: Record<
     ArrowLeft: Stage.INTERVIEW,
     ArrowRight: Stage.HIRED,
   },
-  [Stage.HIRED]: { ArrowLeft: null, ArrowRight: null },
-  [Stage.REJECTED]: { ArrowLeft: null, ArrowRight: null },
+  [Stage.HIRED]: {
+    ArrowLeft: Stage.COMPENSATION_NEGOTIATION,
+    ArrowRight: Stage.REJECTED,
+  },
+  [Stage.REJECTED]: { ArrowLeft: Stage.HIRED, ArrowRight: null },
 };
 
 export const STAGE_LABELS: Record<Stage, string> = {

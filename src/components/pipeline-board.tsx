@@ -69,6 +69,14 @@ const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
   [Stage.REJECTED]: "bg-chart-5",
 };
 
+const NEXT_PROGRESS_STAGES: Record<Stage, Stage | null> = {
+  [Stage.DOCUMENT_REVIEW]: Stage.INTERVIEW,
+  [Stage.INTERVIEW]: Stage.COMPENSATION_NEGOTIATION,
+  [Stage.COMPENSATION_NEGOTIATION]: Stage.HIRED,
+  [Stage.HIRED]: null,
+  [Stage.REJECTED]: null,
+};
+
 interface StageColumnState {
   applicants: Applicant[];
   total: number;
@@ -91,7 +99,6 @@ interface RecentStageChange {
 interface PendingStageChange {
   applicantId: string;
   targetStage: Stage;
-  returnFocusToCard: boolean;
 }
 
 function createInitialColumnState(): StageColumnState {
@@ -119,18 +126,27 @@ function canChangeApplicantStage(
   currentStage: Stage,
   targetStage: Stage,
 ): boolean {
-  const nextStage = getKeyboardStageTarget(currentStage, "ArrowRight");
+  const nextStage = NEXT_PROGRESS_STAGES[currentStage];
 
   return (
     (targetStage === Stage.REJECTED && nextStage !== null) ||
-    nextStage === targetStage ||
-    getKeyboardStageTarget(currentStage, "ArrowLeft") === targetStage
+    nextStage === targetStage
   );
 }
 
 function focusApplicantCard(applicantId: string) {
   window.requestAnimationFrame(function focusMovedApplicantCard() {
     document.getElementById(`applicant-card-${applicantId}`)?.focus();
+  });
+}
+
+function focusDetailAction() {
+  window.requestAnimationFrame(function focusAvailableDetailAction() {
+    document
+      .querySelector<HTMLElement>(
+        '[data-slot="sheet-content"] button:not(:disabled)',
+      )
+      ?.focus();
   });
 }
 
@@ -193,17 +209,17 @@ function formatAppliedAt(appliedAt: string): string {
 function ApplicantCard({
   applicant,
   onSelect,
-  onStageMove,
+  onFocusMove,
 }: {
   applicant: Applicant;
   onSelect: (applicantId: string) => void;
-  onStageMove: (applicantId: string, targetStage: Stage) => void;
+  onFocusMove: (applicantId: string, targetStage: Stage) => void;
 }) {
   function handleSelect() {
     onSelect(applicant.id);
   }
 
-  function handleStageMoveKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+  function handleFocusMoveKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
       return;
     }
@@ -215,7 +231,7 @@ function ApplicantCard({
     }
 
     event.preventDefault();
-    onStageMove(applicant.id, targetStage);
+    onFocusMove(applicant.id, targetStage);
   }
 
   return (
@@ -226,7 +242,7 @@ function ApplicantCard({
       aria-keyshortcuts="ArrowLeft ArrowRight"
       className="block w-full cursor-pointer rounded-xl text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       onClick={handleSelect}
-      onKeyDown={handleStageMoveKeyDown}
+      onKeyDown={handleFocusMoveKeyDown}
     >
       <Card size="sm">
         <CardHeader>
@@ -319,7 +335,7 @@ function PipelineColumn({
   isBoardEmpty,
   hasActiveFilters,
   onApplicantSelect,
-  onApplicantStageMove,
+  onApplicantFocusMove,
   onLoadPage,
 }: {
   stage: Stage;
@@ -327,7 +343,7 @@ function PipelineColumn({
   isBoardEmpty: boolean;
   hasActiveFilters: boolean;
   onApplicantSelect: (applicantId: string) => void;
-  onApplicantStageMove: (applicantId: string, targetStage: Stage) => void;
+  onApplicantFocusMove: (applicantId: string, targetStage: Stage) => void;
   onLoadPage: (
     stage: Stage,
     page: number,
@@ -351,7 +367,7 @@ function PipelineColumn({
         key={applicant.id}
         applicant={applicant}
         onSelect={onApplicantSelect}
-        onStageMove={onApplicantStageMove}
+        onFocusMove={onApplicantFocusMove}
       />
     );
   }
@@ -443,13 +459,13 @@ function PipelineColumns({
   boardState,
   hasActiveFilters,
   onApplicantSelect,
-  onApplicantStageMove,
+  onApplicantFocusMove,
   onLoadPage,
 }: {
   boardState: PipelineBoardState;
   hasActiveFilters: boolean;
   onApplicantSelect: (applicantId: string) => void;
-  onApplicantStageMove: (applicantId: string, targetStage: Stage) => void;
+  onApplicantFocusMove: (applicantId: string, targetStage: Stage) => void;
   onLoadPage: (
     stage: Stage,
     page: number,
@@ -474,7 +490,7 @@ function PipelineColumns({
         isBoardEmpty={isBoardEmpty}
         hasActiveFilters={hasActiveFilters}
         onApplicantSelect={onApplicantSelect}
-        onApplicantStageMove={onApplicantStageMove}
+        onApplicantFocusMove={onApplicantFocusMove}
         onLoadPage={onLoadPage}
       />
     );
@@ -550,7 +566,7 @@ export function PipelineBoard() {
   const nextProgressStage =
     selectedApplicant === undefined
       ? null
-      : getKeyboardStageTarget(selectedApplicant.stage, "ArrowRight");
+      : NEXT_PROGRESS_STAGES[selectedApplicant.stage];
   const canRejectApplicant =
     selectedApplicant !== undefined && nextProgressStage !== null;
   const isStageChangeConfirmationOpen =
@@ -616,7 +632,6 @@ export function PipelineBoard() {
     applicantId: string,
     targetStage: Stage,
     undoChange?: RecentStageChange,
-    returnFocusToCard = false,
   ) {
     const location = findApplicantLocation(boardState, applicantId);
 
@@ -645,10 +660,6 @@ export function PipelineBoard() {
             undoChange.previousIndex,
           );
     });
-
-    if (returnFocusToCard) {
-      focusApplicantCard(applicantId);
-    }
 
     try {
       await updateApplicantStage(applicantId, targetStage);
@@ -681,10 +692,6 @@ export function PipelineBoard() {
         );
       });
 
-      if (returnFocusToCard) {
-        focusApplicantCard(applicantId);
-      }
-
       setHasStageChangeError(true);
     } finally {
       savingApplicantIdsRef.current.delete(applicantId);
@@ -699,7 +706,6 @@ export function PipelineBoard() {
   function requestApplicantStageChange(
     applicantId: string,
     targetStage: Stage,
-    returnFocusToCard = false,
   ) {
     const location = findApplicantLocation(boardState, applicantId);
 
@@ -712,7 +718,7 @@ export function PipelineBoard() {
     }
 
     setPendingUndoChange(null);
-    setPendingStageChange({ applicantId, targetStage, returnFocusToCard });
+    setPendingStageChange({ applicantId, targetStage });
   }
 
   function requestSelectedApplicantStageChange(targetStage: Stage) {
@@ -721,11 +727,23 @@ export function PipelineBoard() {
     }
   }
 
-  function handleApplicantStageMove(
+  function handleApplicantFocusMove(
     applicantId: string,
     targetStage: Stage,
   ) {
-    requestApplicantStageChange(applicantId, targetStage, true);
+    const location = findApplicantLocation(boardState, applicantId);
+
+    if (location === undefined) {
+      return;
+    }
+
+    const targetApplicants = boardState[targetStage].applicants;
+    const targetApplicant =
+      targetApplicants[Math.min(location.index, targetApplicants.length - 1)];
+
+    if (targetApplicant !== undefined) {
+      focusApplicantCard(targetApplicant.id);
+    }
   }
 
   function handleRecentStageChangeUndo() {
@@ -786,12 +804,8 @@ export function PipelineBoard() {
     }
 
     setPendingStageChange(null);
-    void saveApplicantStageChange(
-      pendingApplicant.id,
-      stageChange.targetStage,
-      undefined,
-      stageChange.returnFocusToCard,
-    );
+    void saveApplicantStageChange(pendingApplicant.id, stageChange.targetStage);
+    focusDetailAction();
   }
 
   function handleStageChangeErrorClose() {
@@ -804,6 +818,10 @@ export function PipelineBoard() {
 
   function handleDetailOpenChange(isOpen: boolean) {
     if (!isOpen) {
+      if (selectedApplicantId !== null) {
+        focusApplicantCard(selectedApplicantId);
+      }
+
       setSelectedApplicantId(null);
     }
   }
@@ -986,7 +1004,7 @@ export function PipelineBoard() {
           boardState={boardState}
           hasActiveFilters={hasActiveFilters}
           onApplicantSelect={handleApplicantSelect}
-          onApplicantStageMove={handleApplicantStageMove}
+          onApplicantFocusMove={handleApplicantFocusMove}
           onLoadPage={loadStagePage}
         />
       </div>

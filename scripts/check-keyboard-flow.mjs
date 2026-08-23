@@ -30,9 +30,18 @@ function checkKeyboardStageTargets() {
     getKeyboardStageTarget(Stage.COMPENSATION_NEGOTIATION, "ArrowRight"),
     Stage.HIRED,
   );
-  assert.equal(getKeyboardStageTarget(Stage.HIRED, "ArrowLeft"), null);
-  assert.equal(getKeyboardStageTarget(Stage.HIRED, "ArrowRight"), null);
-  assert.equal(getKeyboardStageTarget(Stage.REJECTED, "ArrowLeft"), null);
+  assert.equal(
+    getKeyboardStageTarget(Stage.HIRED, "ArrowLeft"),
+    Stage.COMPENSATION_NEGOTIATION,
+  );
+  assert.equal(
+    getKeyboardStageTarget(Stage.HIRED, "ArrowRight"),
+    Stage.REJECTED,
+  );
+  assert.equal(
+    getKeyboardStageTarget(Stage.REJECTED, "ArrowLeft"),
+    Stage.HIRED,
+  );
   assert.equal(getKeyboardStageTarget(Stage.REJECTED, "ArrowRight"), null);
 }
 
