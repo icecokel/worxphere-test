@@ -132,12 +132,6 @@ function canChangeApplicantStage(
   );
 }
 
-function focusApplicantCard(applicantId: string) {
-  window.requestAnimationFrame(function focusMovedApplicantCard() {
-    document.getElementById(`applicant-card-${applicantId}`)?.focus();
-  });
-}
-
 async function fetchApplicants(
   stage: Stage,
   page: number,
