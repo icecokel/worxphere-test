@@ -925,6 +925,40 @@
 - `pnpm test:filter`, `pnpm test:pagination`, `pnpm lint`, `pnpm build`, `git diff --check`를 통과했다.
 - Playwright 세션과 `35555` 서버를 종료하고 이번 검증의 임시 산출물을 휴지통으로 이동했다.
 
+## [stage-move-retry-test] PATCH 실패 후 재시도 잠금 해제 검증
+
+### 프롬프트 1
+
+> 1. 7번 이슈 e2e 테스트로 이슈 검증
+> 2. 테스트 결과보고
+
+### 프롬프트 2
+
+> 1. 문서 갱신
+> 2. 깃 이그노어에 playwright\* 추가
+> 3. 이슈 내용 상세히 작성후 클로즈
+
+### AI 출력 요지
+
+- Playwright 실제 브라우저에서 `RACE-03`의 지연 실패, 빠른 연속 확정, 롤백과 성공 재시도를 한 흐름으로 검증했다.
+- 추적 소스와 mock 핸들러는 수정하지 않고 브라우저 세션의 `fetch`만 임시 제어해 PATCH 횟수·본문·응답 상태를 고정했다.
+- 검증 후 실패 고정, 브라우저 저장 상태와 Playwright 세션을 정리했다.
+- 확정된 결과에 맞춰 `DECISIONS.md`와 Phase 6 계획의 경쟁 상태 완료 여부를 갱신하고 `.gitignore`에 `playwright*`를 추가했다.
+- GitHub Issue #7 본문을 환경·단계별 결과·정리·회귀 검사·완료 조건으로 상세 갱신하고 `completed`로 종료했다.
+
+### 리뷰 / 검증
+
+- 초기 단계별 인원수 `320 · 120 · 30 · 50 · 480`을 확인하고 `김민준` 지원자의 `서류검토 → 면접` 변경을 사용했다.
+- PATCH를 700ms 지연된 `500`으로 고정하고 확인 동작을 동기적으로 두 번 실행했을 때 `{ "stage": "INTERVIEW" }` PATCH가 한 번만 발생했다.
+- 저장 중 화면이 `서류검토 319 · 면접 121`, 상세 단계 `면접`, `변경 중…` 버튼 2개로 낙관적 갱신되는지 확인했다.
+- 실패 후 `서류검토 320 · 면접 120`, 상세 단계 `서류검토`, 원래 첫 카드 위치로 복구되고 오류 알림이 표시되는지 확인했다.
+- 같은 지원자에서 응답을 성공으로 전환해 재시도했을 때 새 PATCH가 정확히 한 번 발생하고 `200`으로 완료됐다. 실패·성공 요청 본문은 모두 `{ "stage": "INTERVIEW" }`였다.
+- 성공 후 화면과 `worxphere.applicants.v4` 저장 값이 `INTERVIEW`로 일치하고, 새로고침 뒤에도 `면접` 컬럼과 인원수 `서류검토 319 · 면접 121`이 유지되는지 확인했다.
+- 브라우저 저장 키와 임시 `fetch` 제어를 제거하고 초기 인원수 `서류검토 320 · 면접 120`으로 복구했다.
+- `pnpm test:stage-move` 4건, `pnpm lint`, `pnpm build`, `git diff --check`를 통과했다.
+- `git check-ignore -v`로 `output/playwright/...` 생성물이 `.gitignore`의 `playwright*` 규칙에 의해 제외되는지 확인했다.
+- GitHub Issue #7의 상세 본문과 완료 댓글을 다시 조회하고 상태가 `CLOSED`인지 확인했다.
+
 ## [readme-runtime-sync] README 런타임 정보 최신화
 
 ### 프롬프트 1
