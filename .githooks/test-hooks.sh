@@ -7,7 +7,13 @@ trap 'rm -r -- "$test_dir"' EXIT
 
 export GIT_INDEX_FILE="$test_dir/index"
 git read-tree HEAD
-git add PROMPTS.md
+prompts_oid=$(
+  {
+    git show HEAD:PROMPTS.md
+    printf '\n'
+  } | git hash-object -w --stdin
+)
+git update-index --add --cacheinfo 100644 "$prompts_oid" PROMPTS.md
 
 printf '%s\n' 'feat(project-setup): 훅 검증' > "$test_dir/valid-message"
 "$repo_root/.githooks/commit-msg" "$test_dir/valid-message"
