@@ -826,6 +826,64 @@ export function PipelineBoard() {
     }
   }
 
+  function renderStageChangeStatus(isInDetail: boolean) {
+    if (!hasStageChangeError && recentStageChange === null) {
+      return null;
+    }
+
+    return (
+      <Card
+        role={hasStageChangeError ? "alert" : "status"}
+        size="sm"
+        className={
+          isInDetail
+            ? "fixed right-6 bottom-6 z-[60] w-96 max-w-[calc(100vw-3rem)] lg:absolute lg:right-[444px]"
+            : "fixed right-6 bottom-6 z-50 max-w-sm"
+        }
+      >
+        <CardContent className="flex items-center gap-3">
+          {hasStageChangeError ? (
+            <>
+              <p>{STAGE_CHANGE_ERROR_MESSAGE}</p>
+              <Button
+                className="ml-auto"
+                size="sm"
+                variant="outline"
+                onClick={handleStageChangeErrorClose}
+              >
+                닫기
+              </Button>
+            </>
+          ) : recentStageChange !== null ? (
+            <>
+              <p>
+                {recentStageChange.applicantName} 지원자의 단계를{" "}
+                {STAGE_LABELS[recentStageChange.currentStage]} 단계로
+                변경했습니다.
+              </p>
+              <Button
+                className="ml-auto"
+                size="sm"
+                variant="outline"
+                disabled={isUndoApplicantSaving}
+                onClick={handleRecentStageChangeUndo}
+              >
+                실행 취소
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleRecentStageChangeClose}
+              >
+                닫기
+              </Button>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
+    );
+  }
+
   function renderRoleCheckbox(role: string) {
     return (
       <RoleCheckbox
@@ -1097,6 +1155,7 @@ export function PipelineBoard() {
               ) : null}
             </div>
           ) : null}
+          {renderStageChangeStatus(true)}
         </SheetContent>
       </Sheet>
       <AlertDialog
@@ -1139,53 +1198,9 @@ export function PipelineBoard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {hasStageChangeError || recentStageChange !== null ? (
-        <Card
-          role={hasStageChangeError ? "alert" : "status"}
-          size="sm"
-          className="fixed right-6 bottom-6 z-50 max-w-sm"
-        >
-          <CardContent className="flex items-center gap-3">
-            {hasStageChangeError ? (
-              <>
-                <p>{STAGE_CHANGE_ERROR_MESSAGE}</p>
-                <Button
-                  className="ml-auto"
-                  size="sm"
-                  variant="outline"
-                  onClick={handleStageChangeErrorClose}
-                >
-                  닫기
-                </Button>
-              </>
-            ) : recentStageChange !== null ? (
-              <>
-                <p>
-                  {recentStageChange.applicantName} 지원자의 단계를{" "}
-                  {STAGE_LABELS[recentStageChange.currentStage]} 단계로
-                  변경했습니다.
-                </p>
-                <Button
-                  className="ml-auto"
-                  size="sm"
-                  variant="outline"
-                  disabled={isUndoApplicantSaving}
-                  onClick={handleRecentStageChangeUndo}
-                >
-                  실행 취소
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleRecentStageChangeClose}
-                >
-                  닫기
-                </Button>
-              </>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
+      {selectedApplicant === undefined
+        ? renderStageChangeStatus(false)
+        : null}
     </main>
   );
 }
