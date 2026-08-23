@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 
 import {
   filterApplicants,
+  orderRoles,
   paginateApplicants,
+  ROLES,
+  Stage,
 } from "../src/lib/pipeline.ts";
 
 const applicants = [
@@ -11,14 +14,14 @@ const applicants = [
     name: "홍길동",
     role: "프론트엔드 개발자",
     appliedAt: "2026-08-23T00:00:00.000Z",
-    stage: "서류검토",
+    stage: Stage.DOCUMENT_REVIEW,
   },
   {
     id: "2",
     name: "Alex Kim",
     role: "백엔드 개발자",
     appliedAt: "2026-08-22T00:00:00.000Z",
-    stage: "면접",
+    stage: Stage.INTERVIEW,
   },
 ];
 
@@ -28,11 +31,21 @@ function createApplicant(_value, index) {
     name: index === 720 ? "김서준" : `지원자 ${index + 1}`,
     role: "프론트엔드 개발자",
     appliedAt: "2026-08-23T00:00:00.000Z",
-    stage: "서류검토",
+    stage: Stage.DOCUMENT_REVIEW,
   };
 }
 
 function checkCandidateFilter() {
+  assert.deepEqual(
+    orderRoles([
+      "프로덕트 매니저",
+      "백엔드 개발자",
+      "프론트엔드 개발자",
+      "프로덕트 디자이너",
+      "기타 직무",
+    ]),
+    [...ROLES, "기타 직무"],
+  );
   assert.deepEqual(filterApplicants(applicants, " 길 "), [applicants[0]]);
   assert.deepEqual(filterApplicants(applicants, "ALEX"), [applicants[1]]);
   assert.deepEqual(filterApplicants(applicants, "", ["백엔드 개발자"]), [

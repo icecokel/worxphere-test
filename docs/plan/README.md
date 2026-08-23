@@ -13,8 +13,8 @@
 
 ## 범위
 
-- 이번 계획은 Must 요구사항 완료를 목표로 한다.
-- Should 요구사항은 모든 Must 검증 후에만 검토한다.
+- Phase 1~5는 Must 요구사항 완료를 목표로 한다.
+- Phase 6은 모든 Must 검증 후 Should 요구사항만 독립적으로 진행한다.
 - 지원자 등록·수정·삭제, 공고 관리, 평가, 일정, 메시지, 인증, 실제 백엔드는 작업하지 않는다.
 - 화면은 `/` 단일 경로와 데스크톱 우선 가로 스크롤 보드로 한정한다.
 
@@ -27,15 +27,16 @@
 | 3 | 검색·필터와 상세 패널 구성 | `candidate-filter`, `candidate-detail` | 이름/직무 탐색과 우측 상세 확인 | [Phase 3](phase-3-search-and-detail.md) |
 | 4 | 상세 패널 단계 변경과 낙관적 업데이트 구성 | `stage-move` | 명시적 확인, 저장, 롤백, 실패 알림 | [Phase 4](phase-4-stage-move.md) |
 | 5 | 통합 검증과 제출 문서 정리 | `release-check` | Must 시나리오 검증과 문서 최신화 | [Phase 5](phase-5-verification.md) |
+| 6 | Should 안정성·접근성·성능 개선 | `stage-move-test`, `stage-move-race`, `keyboard-flow`, `stage-undo`, `pipeline-performance` | 다섯 Should 항목 구현·검증 | [Phase 6](phase-6-should-improvements.md) |
 
-Phase는 순서대로 실행한다. 앞 Phase의 완료 기준을 통과하기 전에는 다음 Phase를 시작하지 않는다.
+Phase는 순서대로 실행한다. 앞 Phase의 완료 기준을 통과하기 전에는 다음 Phase를 시작하지 않는다. Phase 6의 Task는 각각 독립된 선택 작업으로 취급한다.
 
 ## Task 실행 규칙
 
 1. Task 시작 전에 해당 Phase 파일과 기준 문서를 다시 확인한다.
 2. Next.js 코드를 수정하기 전 `node_modules/next/dist/docs/`에서 관련 현재 버전 문서를 확인한다.
 3. 공용 UI는 기존 컴포넌트 → shadcn/ui → 신규 도메인 컴포넌트 순서로 선택하고 `shadcn-default-design` 스킬로 기본 스타일을 유지한다.
-4. 새 라이브러리는 추가하지 않는다. 현재 의존성과 브라우저 기본 기능으로 Must를 구현한다.
+4. 새 라이브러리는 추가하지 않는다. 현재 의존성과 브라우저 기본 기능을 사용한다.
 5. 각 feature-key마다 [PROMPTS.md](../../PROMPTS.md)에 실제 프롬프트, AI 출력 요지, 리뷰·검증을 기록한다.
 6. 하나의 기능과 직접 관련된 코드·문서만 같은 커밋에 포함한다.
 7. 각 Task의 검증을 마친 뒤 커밋하며 squash와 force-push를 사용하지 않는다.
@@ -49,6 +50,9 @@ Phase는 순서대로 실행한다. 앞 Phase의 완료 기준을 통과하기 �
 5. `feat(stage-move): 카드 단계 이동과 실패 롤백 추가`
 6. `fix(stage-move): 단계 변경을 상세 패널 액션으로 전환`
 7. `docs(release-check): 구현 검증과 제출 문서 정리`
+8. `docs(should-plan): Phase 6 Should 개선 계획 추가`
+
+Phase 6의 기능 커밋은 [Phase 6 문서](phase-6-should-improvements.md)의 순서를 따른다.
 
 커밋 직전 실제 변경 범위가 다르면 메시지를 실제 diff에 맞추되 feature-key는 유지한다.
 
@@ -65,6 +69,16 @@ Phase는 순서대로 실행한다. 앞 Phase의 완료 기준을 통과하기 �
 | 200건 이상 탐색 성능 | `1.2`, `3.1`, `5.2` |
 | 지원자 상세 패널 | `3.2` |
 | 로딩·요청 실패·빈 상태 | `2.1`, `2.4`, `3.1` |
+
+## Should 추적표
+
+| 요구사항 | 담당 Task |
+| --- | --- |
+| 빠른 연속 변경 경쟁 상태 | `6.2` |
+| 1,000건 스크롤·필터 성능 | `6.5` |
+| 최근 단계 변경 실행 취소 | `6.4` |
+| 낙관적 업데이트·롤백 테스트 | `6.1` |
+| 키보드 단계 이동·상세 열람 | `6.3` |
 
 ## 전체 완료 조건
 
