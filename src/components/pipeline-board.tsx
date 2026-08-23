@@ -40,8 +40,10 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  canChangeApplicantStage,
   getKeyboardStageTarget,
   matchesApplicantFilters,
+  NEXT_PROGRESS_STAGES,
   orderRoles,
   Stage,
   STAGE_LABELS,
@@ -68,14 +70,6 @@ const STAGE_DOT_CLASS_NAMES: Record<Stage, string> = {
   [Stage.COMPENSATION_NEGOTIATION]: "bg-chart-3",
   [Stage.HIRED]: "bg-chart-4",
   [Stage.REJECTED]: "bg-chart-5",
-};
-
-const NEXT_PROGRESS_STAGES: Record<Stage, Stage | null> = {
-  [Stage.DOCUMENT_REVIEW]: Stage.INTERVIEW,
-  [Stage.INTERVIEW]: Stage.COMPENSATION_NEGOTIATION,
-  [Stage.COMPENSATION_NEGOTIATION]: Stage.HIRED,
-  [Stage.HIRED]: null,
-  [Stage.REJECTED]: null,
 };
 
 interface StageColumnState {
@@ -121,18 +115,6 @@ function createInitialBoardState(): PipelineBoardState {
   return Object.fromEntries(
     STAGES.map(createInitialStageEntry),
   ) as PipelineBoardState;
-}
-
-function canChangeApplicantStage(
-  currentStage: Stage,
-  targetStage: Stage,
-): boolean {
-  const nextStage = NEXT_PROGRESS_STAGES[currentStage];
-
-  return (
-    (targetStage === Stage.REJECTED && nextStage !== null) ||
-    nextStage === targetStage
-  );
 }
 
 function focusApplicantCard(applicantId: string) {

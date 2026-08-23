@@ -12,6 +12,14 @@ export const STAGES: readonly Stage[] = Object.values(Stage);
 
 export type StageArrowKey = "ArrowLeft" | "ArrowRight";
 
+export const NEXT_PROGRESS_STAGES: Record<Stage, Stage | null> = {
+  [Stage.DOCUMENT_REVIEW]: Stage.INTERVIEW,
+  [Stage.INTERVIEW]: Stage.COMPENSATION_NEGOTIATION,
+  [Stage.COMPENSATION_NEGOTIATION]: Stage.HIRED,
+  [Stage.HIRED]: null,
+  [Stage.REJECTED]: null,
+};
+
 const KEYBOARD_STAGE_TARGETS: Record<
   Stage,
   Record<StageArrowKey, Stage | null>
@@ -85,6 +93,18 @@ export function getKeyboardStageTarget(
   key: StageArrowKey,
 ): Stage | null {
   return KEYBOARD_STAGE_TARGETS[stage][key];
+}
+
+export function canChangeApplicantStage(
+  currentStage: Stage,
+  targetStage: Stage,
+): boolean {
+  const nextStage = NEXT_PROGRESS_STAGES[currentStage];
+
+  return (
+    (targetStage === Stage.REJECTED && nextStage !== null) ||
+    nextStage === targetStage
+  );
 }
 
 export function orderRoles(roles: Iterable<string>): string[] {
